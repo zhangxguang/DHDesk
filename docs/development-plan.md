@@ -333,8 +333,9 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] 两个平台成功构建安装包和 SHA-256 文件。
 - [x] 上传 `DHDesk-mac-arm64` 和 `DHDesk-win-x64` Artifacts。
 - [x] CI 构建显式禁用隐式发布和证书自动发现。
+- [ ] Windows CI 静默安装 NSIS 包，并验证应用、内置 Node 和 Harness 入口完整（步骤已加入，待首次成功运行确认）。
 - [ ] 更新 GitHub Actions 依赖，消除旧 Node.js Action Runtime 警告。
-- [ ] 增加安装包内容、启动和签名状态自动验证。
+- [ ] 增加 macOS 安装包内容、应用启动和双平台签名状态自动验证。
 - [ ] Tag 构建正式签名产物，并在双平台验证通过后创建 GitHub Release。
 
 ## 7. 安全与正式发布

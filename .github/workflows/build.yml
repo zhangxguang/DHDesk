@@ -80,6 +80,44 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run ${{ matrix.package-script }}
 
+      - name: Verify Windows installer extraction
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Get-ChildItem -Path release -Filter "*-setup.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "Windows NSIS installer was not generated."
+          }
+
+          $installDir = Join-Path $env:RUNNER_TEMP "DHDesk-install-smoke"
+          $process = Start-Process `
+            -FilePath $installer.FullName `
+            -ArgumentList @("/S", "/D=$installDir") `
+            -PassThru
+          if (-not $process.WaitForExit(180000)) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            throw "Windows NSIS installer did not finish within 180 seconds."
+          }
+          if ($process.ExitCode -ne 0) {
+            throw "Windows NSIS installer failed with exit code $($process.ExitCode)."
+          }
+
+          $appExecutable = Join-Path $installDir "DHDesk.exe"
+          $nodeExecutable = Join-Path $installDir "resources\node\node.exe"
+          $dshEntry = Join-Path $installDir "resources\bundled-runtime\node_modules\@deepseek-ai\dsh\lib\bin.js"
+          foreach ($requiredPath in @($appExecutable, $nodeExecutable, $dshEntry)) {
+            if (-not (Test-Path $requiredPath -PathType Leaf)) {
+              throw "Installed package is missing: $requiredPath"
+            }
+          }
+
+          $expectedVersion = (Get-Content resources/runtime-manifest.json | ConvertFrom-Json).harnessVersion
+          $installedVersion = (& $nodeExecutable $dshEntry --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $installedVersion -ne $expectedVersion) {
+            throw "Installed Harness version '$installedVersion' does not match '$expectedVersion'."
+          }
+
       - name: Write SHA-256 checksums
         run: npm run artifacts:checksums
 

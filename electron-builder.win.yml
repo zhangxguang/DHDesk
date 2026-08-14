@@ -34,7 +34,10 @@ win:
       arch:
         - x64
 nsis:
-  # Prefer faster extraction over the smaller LZMA archive. The bundled Runtime
+  # electron-builder 26 only emits an actual ZIP payload when differential
+  # packaging is disabled. Otherwise NSIS tries to open a 7z payload as ZIP.
+  differentialPackage: false
+  # Prefer faster extraction over the smaller 7z archive. The bundled Runtime
   # contains thousands of small files, so installation latency matters more.
   useZip: true
   perMachine: false

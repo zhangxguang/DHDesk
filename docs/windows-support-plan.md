@@ -3,7 +3,7 @@
 > 目标平台：macOS arm64 + Windows x64
 > 文档状态：实施中（双平台构建已完成，Windows 正式签名与真机验收待完成）
 > 最后更新：2026-08-14
-> 对应分支：`feature/windows-support`
+> 对应分支：已合并至 `main`
 
 ## 1. 目标与结论
 

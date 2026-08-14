@@ -2,13 +2,13 @@
 
 > 目标平台：macOS 14+ arm64、Windows 10 22H2 / Windows 11 x64
 >
-> 当前版本：`0.1.1`
+> 当前版本：`0.1.2`
 >
-> 当前分支：`feature/windows-support`
+> 当前分支：`main`
 >
 > 最后同步：2026-08-14
 >
-> 状态依据：当前仓库源码、34 项自动化测试及 GitHub Actions 双平台成功构建
+> 状态依据：当前仓库源码、35 项自动化测试及 GitHub Actions 双平台成功构建
 
 ## 1. 项目概述
 
@@ -299,9 +299,10 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] 下载完成后由用户确认，先安全停止 Harness 再重启安装。
 - [x] 开发模式禁用自更新，避免读取正式发布通道。
 - [x] macOS Release 同时生成更新 ZIP、Blockmap 和 `latest-mac.yml`。
+- [x] DMG 完成签名和 Stapling 后将 `latest-mac.yml` 收敛为最终 ZIP，重新计算实际大小和 SHA-512，避免发布过期 DMG 元数据。
 - [x] Windows Release 生成 NSIS EXE、Blockmap 和 `latest.yml`。
 - [x] 更新元数据和安装包由 electron-builder 提供 SHA-512 完整性校验。
-- [ ] 在已安装的 macOS 0.1.1 和 Windows 0.1.1 上完成跨版本升级验收。
+- [ ] 在已安装的 macOS 0.1.1 和 Windows 0.1.1 上完成升级到 0.1.2 的真机 UI 验收。
 
 ## 6. 双平台 Runtime、打包与 CI
 
@@ -395,7 +396,7 @@ GitHub Actions 使用 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`�
 - [ ] 发布包包含 Electron、Node.js、DeepSeek Harness 和第三方依赖许可证。
 - [ ] 提供隐私说明，明确 DHDesk 不收集或上传 `.dsh` 凭据。
 - [ ] 签名凭据只通过 CI Secret 或受控签名服务提供。
-- [ ] GitHub Release 同时发布 DMG、EXE 和对应 SHA-256 文件。
+- [x] GitHub Release 同时发布 DMG、ZIP、EXE、更新元数据和对应 SHA-256 文件。
 - [ ] 产品描述明确 DHDesk 为非官方工具，避免暗示 DeepSeek 官方背书。
 
 ## 8. 开发阶段与里程碑
@@ -407,13 +408,13 @@ GitHub Actions 使用 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`�
 | 阶段 2 | Harness 检查、安装、切换和回滚 | 核心完成 | 备份提示、清理策略、故障注入测试 |
 | 阶段 3 | macOS/Windows Runtime 和安装包 | 已完成内测构建 | 双平台真实机器安装与功能验收 |
 | 阶段 4 | 双平台 CI Artifact | 已完成 | 包内容验证、Action 版本升级 |
-| 阶段 5 | 正式签名、公证和 Release | 部分完成 | macOS 已完成；执行首个 Tag Release，Windows 签名仍待完成 |
+| 阶段 5 | 正式签名、公证和 Release | 部分完成 | macOS 和公开 GitHub Release 已完成；Windows 签名仍待完成 |
 | 阶段 6 | DHDesk 自更新和增强 | 自更新核心完成 | 跨版本安装验收、版本管理页、菜单栏模式 |
 
 ### 8.1 下一阶段优先级
 
 1. 在干净 Windows 10/11 和 macOS 14+ 机器完成安装、启动、退出和 Harness 更新验收。
-2. 用下一版本验证 DHDesk 在 macOS/Windows 上从 0.1.1 跨版本自更新。
+2. 完成 DHDesk 从 0.1.1 升级到 0.1.2 的 macOS/Windows 真机 UI 验收。
 3. 确认并接入 Windows Authenticode 或 Azure Trusted Signing。
 4. 完成窗口状态恢复、诊断信息复制、下载处理和完整日志脱敏。
 5. 增加 Harness 更新失败、损坏包、断网和进程残留测试。
@@ -423,7 +424,7 @@ GitHub Actions 使用 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`�
 
 ### 9.1 已有自动化测试
 
-当前共有 8 个测试文件、34 项测试，覆盖：
+当前共有 9 个测试文件、35 项测试，覆盖：
 
 - [x] 激活 Runtime 原子写入、确认和回滚。
 - [x] Harness 更新状态、版本检查、安装和错误处理。
@@ -433,6 +434,7 @@ GitHub Actions 使用 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`�
 - [x] Runtime 平台元数据读写和不匹配拒绝。
 - [x] Windows `taskkill` 参数与平台化进程树逻辑。
 - [x] DHDesk 自更新的开发模式禁用、版本检查、下载进度、失败和重启安装状态。
+- [x] macOS 最终更新元数据只引用 ZIP，并使用实际 SHA-512 和文件大小。
 
 ### 9.2 待补自动化测试
 

@@ -1,6 +1,6 @@
 {
   "name": "dhdesk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "A macOS and Windows desktop launcher and runtime manager for DeepSeek Harness.",
   "author": "zxg",
@@ -24,6 +24,7 @@
     "runtime:prepare": "npm run runtime:prepare:node && npm run runtime:prepare:harness",
     "runtime:prepare:node": "node scripts/prepare-node-runtime.mjs",
     "runtime:prepare:harness": "node scripts/prepare-harness-runtime.mjs",
+    "artifacts:finalize-mac-update": "node scripts/finalize-mac-update-metadata.mjs",
     "artifacts:checksums": "node scripts/write-artifact-checksums.mjs",
     "package:dir": "npm run package:dir:mac",
     "package:dir:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir --mac -c electron-builder.mac.yml",

@@ -207,6 +207,7 @@ jobs:
             --wait
           xcrun stapler staple "${dmg_path}"
           xcrun stapler validate "${dmg_path}"
+          npm run artifacts:finalize-mac-update
 
       - name: Package Windows artifact
         if: matrix.platform == 'win32'
@@ -219,6 +220,10 @@ jobs:
           set -euo pipefail
           test -f release/latest-mac.yml
           grep -Fq '.zip' release/latest-mac.yml
+          if grep -Fq '.dmg' release/latest-mac.yml; then
+            echo "latest-mac.yml must only reference the finalized ZIP update asset." >&2
+            exit 1
+          fi
 
       - name: Verify Windows update metadata
         if: matrix.platform == 'win32'

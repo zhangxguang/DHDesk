@@ -60,7 +60,7 @@ DHDesk 同时提供独立的 Harness 版本管理能力，包括检查、下载�
 | 出厂 Runtime | `@deepseek-ai/dsh@0.1.0-rc.6` | 已实现 |
 | Harness 更新 | npm Registry + 版本化 Runtime 目录 | 核心链路已实现 |
 | DHDesk 自更新 | 待选型，优先评估 `electron-updater` | 未实现 |
-| macOS 打包 | electron-builder DMG arm64 | 已实现未签名 CI 包 |
+| macOS 打包 | electron-builder DMG arm64 | 已实现 ad-hoc 签名 CI 内测包，正式 Developer ID 签名未完成 |
 | Windows 打包 | electron-builder NSIS x64 | 已实现未签名 CI 包 |
 | CI | GitHub Actions 原生双平台矩阵 | 已实现 |
 
@@ -225,7 +225,7 @@ Windows 上 `child.kill("SIGTERM")` 不等同于 Unix 优雅退出；当前实�
 - [x] 刷新 Harness 页面不会重复启动服务。
 - [x] macOS 和 Windows 使用各自有效的应用菜单。
 - [x] 更新窗口的 macOS 标题栏按钮逻辑具有平台保护。
-- [x] 主窗口关闭按钮在 macOS 最小化到 Dock、在 Windows 最小化到任务栏；菜单“退出”仍执行完整退出流程。
+- [x] 主窗口关闭按钮在 macOS 隐藏窗口、在 Windows 最小化到任务栏；点击 Dock 图标可恢复 macOS 窗口，菜单“退出”或 `Command+Q` 仍执行完整退出流程。
 - [ ] 保存并恢复主窗口尺寸和位置。
 - [ ] 明确处理 Web UI 下载行为和下载完成提示。
 - [ ] 在 Windows 100%、125%、150%、200% 显示缩放下验收布局和点击位置。
@@ -361,7 +361,7 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [ ] 通过 `codesign --verify --deep --strict`、`spctl` 和 Gatekeeper 验证。
 - [ ] 在无开发环境的干净 Mac 上验证安装、运行和 Harness 更新。
 
-现有本机构建曾使用 Apple Development 证书签名，但这不等同于 Developer ID 正式分发签名。当前 GitHub Actions DMG 明确为未签名 Artifact。
+现有本机构建曾使用 Apple Development 证书签名，但这不等同于 Developer ID 正式分发签名。GitHub Actions 分支构建使用 ad-hoc 签名封装完整 App，并执行 `codesign --verify --deep --strict` 校验；它只用于内测，不能替代 Developer ID 签名和 Apple 公证。
 
 ### 7.3 Windows 发布
 

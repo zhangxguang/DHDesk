@@ -25,6 +25,7 @@
     "package:dir:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir --mac -c electron-builder.mac.yml",
     "package:dir:win": "npm run build && electron-builder --dir --win --x64 -c electron-builder.win.yml",
     "package:dmg": "npm run build && electron-builder --mac dmg --arm64 -c electron-builder.mac.yml --publish never",
+    "package:dmg:ci": "npm run package:dmg -- --config.mac.identity=-",
     "package:nsis": "npm run build && electron-builder --win nsis --x64 -c electron-builder.win.yml --publish never"
   },
   "devDependencies": {

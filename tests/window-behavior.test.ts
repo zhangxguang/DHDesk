@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { shouldMinimizeOnClose } from "../src/main/window-behavior";
+import { getWindowCloseBehavior } from "../src/main/window-behavior";
 
 describe("window close behavior", () => {
   it("minimizes a Windows main window when the app is still running", () => {
-    expect(shouldMinimizeOnClose("win32", false)).toBe(true);
+    expect(getWindowCloseBehavior("win32", false)).toBe("minimize");
   });
 
   it("allows a Windows main window to close during app shutdown", () => {
-    expect(shouldMinimizeOnClose("win32", true)).toBe(false);
+    expect(getWindowCloseBehavior("win32", true)).toBe("close");
   });
 
-  it("minimizes a macOS main window when the app is still running", () => {
-    expect(shouldMinimizeOnClose("darwin", false)).toBe(true);
+  it("hides a macOS main window when the app is still running", () => {
+    expect(getWindowCloseBehavior("darwin", false)).toBe("hide");
   });
 
   it("allows a macOS main window to close during app shutdown", () => {
-    expect(shouldMinimizeOnClose("darwin", true)).toBe(false);
+    expect(getWindowCloseBehavior("darwin", true)).toBe("close");
   });
 
   it("does not change close behavior on unsupported platforms", () => {
-    expect(shouldMinimizeOnClose("linux", false)).toBe(false);
+    expect(getWindowCloseBehavior("linux", false)).toBe("close");
   });
 });

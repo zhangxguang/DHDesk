@@ -248,6 +248,7 @@ function registerApplicationMenu(): void {
 
 function registerLifecycle(): void {
   app.on("second-instance", () => windowManager.focus());
+  app.on("activate", () => windowManager.focus());
   app.on("window-all-closed", () => app.quit());
   app.on("before-quit", (event) => {
     if (isQuitting) return;

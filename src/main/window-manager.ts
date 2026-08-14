@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import type { HarnessUpdateSnapshot, RuntimeSnapshot } from "../shared/contracts";
 import { IPC_CHANNELS } from "../shared/contracts";
-import { shouldMinimizeOnClose } from "./window-behavior";
+import { getWindowCloseBehavior } from "./window-behavior";
 
 export class WindowManager {
   private window?: BrowserWindow;
@@ -47,9 +47,11 @@ export class WindowManager {
       if (window.webContents.getURL().startsWith("file:")) this.publishState(this.snapshot);
     });
     window.on("close", (event) => {
-      if (!shouldMinimizeOnClose(process.platform, this.appQuitting)) return;
+      const behavior = getWindowCloseBehavior(process.platform, this.appQuitting);
+      if (behavior === "close") return;
       event.preventDefault();
-      window.minimize();
+      if (behavior === "hide") window.hide();
+      else window.minimize();
     });
 
     window.on("closed", () => {

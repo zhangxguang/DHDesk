@@ -24,7 +24,7 @@ jobs:
             runner: macos-14
             platform: darwin
             arch: arm64
-            package-script: package:dmg
+            package-script: package:dmg:ci
             artifact-name: DHDesk-mac-arm64
             artifact-path: |
               release/*.dmg
@@ -79,6 +79,16 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run ${{ matrix.package-script }}
+
+      - name: Verify macOS application signature
+        if: matrix.platform == 'darwin'
+        run: |
+          app_path="release/mac-arm64/DHDesk.app"
+          if [[ ! -d "$app_path" ]]; then
+            echo "macOS app bundle was not generated: $app_path" >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "$app_path"
 
       - name: Verify Windows installer extraction
         if: matrix.platform == 'win32'

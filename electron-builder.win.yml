@@ -34,6 +34,9 @@ win:
       arch:
         - x64
 nsis:
+  # Prefer faster extraction over the smaller LZMA archive. The bundled Runtime
+  # contains thousands of small files, so installation latency matters more.
+  useZip: true
   perMachine: false
   createDesktopShortcut: always
   createStartMenuShortcut: true

@@ -312,6 +312,7 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] 生成 `DHDesk-<version>-win-x64-setup.exe`。
 - [x] 为 DMG 和 EXE 生成 SHA-256 校验文件。
 - [x] 打包命令显式使用 `--publish never`，构建 Artifact 时不隐式创建 GitHub Release。
+- [x] Windows NSIS 使用 ZIP 归档，优先缩短大量小文件的安装解压时间。
 
 ### 6.3 Windows NSIS
 

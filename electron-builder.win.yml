@@ -1,0 +1,35 @@
+extends: electron-builder.base.yml
+extraResources:
+  - from: resources/node
+    to: node
+    filter:
+      - node.exe
+      - npm.cmd
+      - npx.cmd
+      - LICENSE
+  - from: resources/node/node_modules/npm
+    to: node/node_modules/npm
+    filter:
+      - "**/*"
+  # electron-builder skips a source directory named node_modules by default.
+  - from: resources/bundled-runtime/node_modules
+    to: bundled-runtime/node_modules
+    filter:
+      - "**/*"
+      - "!node-pty/prebuilds/darwin-*/**/*"
+      - "!node-pty/prebuilds/linux-*/**/*"
+      - "!node-pty/prebuilds/win32-arm64/**/*"
+win:
+  icon: resources/icons/app-icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+  installerIcon: resources/icons/app-icon.ico
+  uninstallerIcon: resources/icons/app-icon.ico
+  artifactName: "DHDesk-${version}-win-${arch}-setup.${ext}"

@@ -92,7 +92,7 @@ export class WindowManager {
       }
     });
     this.updaterWindow = updaterWindow;
-    updaterWindow.setWindowButtonVisibility(true);
+    if (process.platform === "darwin") updaterWindow.setWindowButtonVisibility(true);
     updaterWindow.setTitle("Harness 更新");
     updaterWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     updaterWindow.webContents.on("will-navigate", (event, url) => {

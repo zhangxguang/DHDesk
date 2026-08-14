@@ -1,8 +1,11 @@
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { RuntimeLogger } from "../src/main/logging";
+import { buildWindowsTreeKillArgs, terminateProcessTree } from "../src/main/process-tree";
 import { HarnessProcessSupervisor, parseHarnessUrl } from "../src/main/process-supervisor";
 
 describe("parseHarnessUrl", () => {
@@ -35,5 +38,24 @@ describe("parseHarnessUrl", () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("Windows process tree termination", () => {
+  it("builds taskkill arguments without using a shell command string", () => {
+    expect(buildWindowsTreeKillArgs(4312, false)).toEqual(["/PID", "4312", "/T"]);
+    expect(buildWindowsTreeKillArgs(4312, true)).toEqual(["/PID", "4312", "/T", "/F"]);
+    expect(() => buildWindowsTreeKillArgs(-1, true)).toThrow("无效的进程 PID");
+  });
+
+  it("terminates a detached Node process on the native platform", async () => {
+    const child = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000)"], {
+      detached: process.platform !== "win32",
+      stdio: "ignore",
+      windowsHide: process.platform === "win32"
+    });
+    await once(child, "spawn");
+    await terminateProcessTree(child, { gracefulTimeoutMs: 300, forceTimeoutMs: 1_000 });
+    expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
   });
 });

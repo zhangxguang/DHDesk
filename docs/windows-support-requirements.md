@@ -18,6 +18,24 @@
 | P1 | 双平台持续构建和质量保障项 |
 | P2 | 正式对外发布前完成 |
 
+### 1.1 当前实施状态
+
+> 状态更新时间：2026-08-14
+
+| Epic | 当前状态 | 已完成 | 仍需验证/决策 |
+|---|---|---|---|
+| E0 平台模型 | 已实现 | 共享平台布局、Runtime 标记读写与严格校验、单元测试 | Windows CI 回归 |
+| E1 Node Runtime | macOS 已验证 | 双平台下载/校验/解压逻辑，macOS arm64 自检通过 | Windows x64 原生下载和自检 |
+| E2 Harness Runtime | macOS 已验证 | 内置 Node/npm 安装、原生依赖检查、平台标记、Web 冒烟测试 | Windows x64 原生模块和 Web 冒烟测试 |
+| E3 定位与更新 | 已实现 | 双平台路径、Node 身份检查、Updater 标记校验/补写、无效 Runtime 重装 | Windows 应用内真实升级/回滚 |
+| E4 进程生命周期 | 已实现 | `windowsHide`、统一进程树终止、taskkill 参数及原生进程终止测试 | Windows 下无闪窗、无 `conhost.exe` 残留验收 |
+| E5 UI 适配 | 已实现平台分支 | macOS/Windows 菜单分支、macOS 窗口按钮 API 隔离 | Windows 高 DPI 和按钮命中手工验收 |
+| E6 打包与 NSIS | macOS 已验证 | builder 配置拆分、`extends` 合并、平台资源过滤、多尺寸 ICO、DMG 构建 | Windows NSIS 原生构建；DEC-001 最终确认 |
+| E7 测试与 CI | 已配置待运行 | 25 个本地测试、双平台 GitHub Actions、SHA-256 产物文件 | 推送后观察 macOS/Windows 两个 Job |
+| E8 签名发布 | 未开始 | 无 | Developer ID 公证、Windows 签名方案和分发渠道 |
+
+“已实现”表示代码与本地自动化检查完成，不等于 Windows 原生验收完成。Windows 相关需求只有在目标 Runner 或干净 Windows 机器通过后才能勾选最终验收项。
+
 ## 2. 交付范围
 
 ### 2.1 本期交付
@@ -546,4 +564,3 @@ flowchart LR
 - [ ] 退出和卸载后无 DHDesk 创建的 `node.exe`、Harness 或 `conhost.exe` 残留。
 - [ ] 默认卸载保留 `%USERPROFILE%\.dsh`。
 - [ ] macOS arm64 启动、更新和 DMG 构建回归通过。
-

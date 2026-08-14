@@ -7,11 +7,14 @@ import { IPC_CHANNELS } from "../shared/contracts";
 import { confirmActiveRuntime, rollbackActiveRuntime } from "./active-runtime";
 import { HarnessUpdater } from "./harness-updater";
 import { RuntimeLogger } from "./logging";
+import { ensureRuntimePlatformMetadata } from "./runtime-metadata";
 import { HarnessProcessSupervisor } from "./process-supervisor";
 import {
+  inspectNodeRuntime,
   locateHarnessRuntime,
   locateNodeRuntime,
   locateNpmCli,
+  type NodeRuntimeIdentity,
   type RuntimeInstallation
 } from "./runtime-locator";
 import { WindowManager } from "./window-manager";
@@ -53,12 +56,6 @@ async function startHarness(options: { allowPendingRollback?: boolean } = {}): P
   try {
     const appRoot = app.getAppPath();
     const resourcesPath = process.resourcesPath;
-    runtime = await locateHarnessRuntime({
-      appRoot,
-      resourcesPath,
-      userDataPath: app.getPath("userData"),
-      entryOverride: process.env.DHDESK_DSH_ENTRY
-    });
     const node = await locateNodeRuntime({
       appRoot,
       resourcesPath,
@@ -66,7 +63,17 @@ async function startHarness(options: { allowPendingRollback?: boolean } = {}): P
       electronExecutable: process.execPath,
       isElectron: Boolean(process.versions.electron)
     });
-    await ensureUpdater(runtime, node.executablePath, appRoot, resourcesPath);
+    const nodeIdentity = await inspectNodeRuntime(node);
+    runtime = await locateHarnessRuntime({
+      appRoot,
+      resourcesPath,
+      userDataPath: app.getPath("userData"),
+      entryOverride: process.env.DHDESK_DSH_ENTRY,
+      platform: nodeIdentity.platform,
+      arch: nodeIdentity.arch,
+      nodeVersion: nodeIdentity.version
+    });
+    await ensureUpdater(runtime, node.executablePath, nodeIdentity, appRoot, resourcesPath);
 
     await logger.info(`Resolved Harness ${runtime.version} from ${runtime.source}: ${runtime.entryPath}`);
     supervisor = new HarnessProcessSupervisor({
@@ -91,6 +98,16 @@ async function startHarness(options: { allowPendingRollback?: boolean } = {}): P
       await new Promise((resolvePromise) => setTimeout(resolvePromise, Math.min(startupHoldMs, 30_000)));
     }
     if (running.url) await windowManager.loadHarness(running.url);
+    if (runtime.source === "managed" && runtime.metadataMissing) {
+      await ensureRuntimePlatformMetadata(runtime.rootPath, {
+        platform: nodeIdentity.platform,
+        arch: nodeIdentity.arch,
+        nodeVersion: nodeIdentity.version,
+        harnessVersion: runtime.version
+      });
+      runtime = { ...runtime, metadataMissing: false };
+      await logger.info(`Added missing platform metadata for managed Harness runtime ${runtime.version}`);
+    }
     if (runtime.source === "managed" && runtime.pendingValidation) {
       await confirmActiveRuntime(app.getPath("userData"), runtime.version);
       runtime = { ...runtime, pendingValidation: false };
@@ -119,6 +136,7 @@ async function startHarness(options: { allowPendingRollback?: boolean } = {}): P
 async function ensureUpdater(
   runtime: RuntimeInstallation,
   nodeExecutable: string,
+  nodeIdentity: NodeRuntimeIdentity,
   appRoot: string,
   resourcesPath: string
 ): Promise<void> {
@@ -128,6 +146,7 @@ async function ensureUpdater(
     userDataPath: app.getPath("userData"),
     nodeExecutable,
     npmCliPath,
+    nodeIdentity,
     currentRuntime: runtime,
     logger,
     registryUrl: process.env.DHDESK_NPM_REGISTRY
@@ -178,41 +197,52 @@ function registerIpc(): void {
 }
 
 function registerApplicationMenu(): void {
-  const template: MenuItemConstructorOptions[] = [
-    {
-      label: app.name,
-      submenu: [
-        { role: "about" },
-        { type: "separator" },
-        { role: "hide" },
-        { role: "hideOthers" },
-        { role: "unhide" },
-        { type: "separator" },
-        { role: "quit" }
-      ]
-    },
-    {
-      label: "Harness",
-      submenu: [
+  const harnessMenu: MenuItemConstructorOptions = {
+    label: "Harness",
+    submenu: [
+      {
+        label: "检查 Harness 更新…",
+        accelerator: "CommandOrControl+Shift+U",
+        click: () => void windowManager.showUpdater()
+      },
+      {
+        label: "重新启动 Harness",
+        click: () => void startHarness()
+      },
+      { type: "separator" },
+      {
+        label: "打开日志目录",
+        click: () => void shell.openPath(app.getPath("logs"))
+      }
+    ]
+  };
+  const template: MenuItemConstructorOptions[] = process.platform === "darwin"
+    ? [
         {
-          label: "检查 Harness 更新…",
-          accelerator: "CommandOrControl+Shift+U",
-          click: () => void windowManager.showUpdater()
+          label: app.name,
+          submenu: [
+            { role: "about" },
+            { type: "separator" },
+            { role: "hide" },
+            { role: "hideOthers" },
+            { role: "unhide" },
+            { type: "separator" },
+            { role: "quit" }
+          ]
         },
-        {
-          label: "重新启动 Harness",
-          click: () => void startHarness()
-        },
-        { type: "separator" },
-        {
-          label: "打开日志目录",
-          click: () => void shell.openPath(app.getPath("logs"))
-        }
+        harnessMenu,
+        { role: "editMenu" },
+        { role: "windowMenu" }
       ]
-    },
-    { role: "editMenu" },
-    { role: "windowMenu" }
-  ];
+    : [
+        {
+          label: "文件",
+          submenu: [{ role: "quit", label: "退出" }]
+        },
+        harnessMenu,
+        { role: "editMenu" },
+        { role: "windowMenu" }
+      ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 

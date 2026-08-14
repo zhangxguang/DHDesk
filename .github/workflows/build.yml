@@ -1,0 +1,89 @@
+name: Build desktop artifacts
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feature/windows-support
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64 DMG
+            runner: macos-14
+            platform: darwin
+            arch: arm64
+            package-script: package:dmg
+            artifact-name: DHDesk-mac-arm64
+            artifact-path: |
+              release/*.dmg
+              release/*.dmg.sha256
+          - name: Windows x64 NSIS
+            runner: windows-2022
+            platform: win32
+            arch: x64
+            package-script: package:nsis
+            artifact-name: DHDesk-win-x64
+            artifact-path: |
+              release/*.exe
+              release/*.exe.sha256
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+
+      - name: Verify native runner
+        env:
+          DHDESK_EXPECTED_PLATFORM: ${{ matrix.platform }}
+          DHDESK_EXPECTED_ARCH: ${{ matrix.arch }}
+        run: node scripts/assert-build-target.mjs
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Restore platform Runtime cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            resources/node
+            resources/bundled-runtime
+          key: dhdesk-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('resources/runtime-manifest.json') }}
+
+      - name: Prepare native Runtime
+        run: npm run runtime:prepare
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Package
+        run: npm run ${{ matrix.package-script }}
+
+      - name: Write SHA-256 checksums
+        run: npm run artifacts:checksums
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-path }}
+          if-no-files-found: error

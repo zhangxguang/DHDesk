@@ -3,12 +3,19 @@ import { EventEmitter } from "node:events";
 import { access, mkdir, mkdtemp, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import type { HarnessUpdateSnapshot } from "../shared/contracts";
 import { activateRuntime, assertSafeVersion } from "./active-runtime";
 import type { RuntimeLogger } from "./logging";
+import {
+  ensureRuntimePlatformMetadata,
+  requireRuntimePlatformMetadata,
+  RuntimeMetadataError,
+  type ExpectedRuntimeMetadata
+} from "./runtime-metadata";
 import { HarnessProcessSupervisor } from "./process-supervisor";
-import type { RuntimeInstallation } from "./runtime-locator";
+import { terminateProcessTree } from "./process-tree";
+import type { NodeRuntimeIdentity, RuntimeInstallation } from "./runtime-locator";
 
 const PACKAGE_NAME = "@deepseek-ai/dsh";
 const DEFAULT_REGISTRY_URL = "https://registry.npmjs.org";
@@ -26,6 +33,7 @@ export interface HarnessUpdaterOptions {
   userDataPath: string;
   nodeExecutable: string;
   npmCliPath: string;
+  nodeIdentity: NodeRuntimeIdentity;
   currentRuntime: RuntimeInstallation;
   logger: RuntimeLogger;
   registryUrl?: string;
@@ -84,7 +92,7 @@ export class HarnessUpdater extends EventEmitter {
         );
         this.metadata = metadata;
         const updateAvailable = isNewerVersion(metadata.version, this.snapshot.currentVersion);
-        const installed = await runtimeExists(this.runtimePath(metadata.version));
+        const installed = await this.installedRuntimeIsCompatible(metadata.version);
 
         if (installed && updateAvailable) {
           this.setState({
@@ -148,6 +156,7 @@ export class HarnessUpdater extends EventEmitter {
     const version = this.snapshot.installedVersion;
     if (!version) throw new Error("没有等待启用的 Harness 版本。");
     await validateRuntime(this.runtimePath(version), version, this.options.nodeExecutable, this.options.logger, false);
+    await this.ensureRuntimeMarker(this.runtimePath(version), version);
 
     const previousVersion = this.currentSource === "managed" ? this.snapshot.currentVersion : undefined;
     await activateRuntime(this.options.userDataPath, version, previousVersion);
@@ -178,9 +187,18 @@ export class HarnessUpdater extends EventEmitter {
     await mkdir(runtimesRoot, { recursive: true, mode: 0o700 });
 
     if (await runtimeExists(finalPath)) {
-      await validateRuntime(finalPath, metadata.version, this.options.nodeExecutable, this.options.logger, true);
-      this.ready(metadata.version);
-      return;
+      try {
+        await validateRuntime(finalPath, metadata.version, this.options.nodeExecutable, this.options.logger, true);
+        await this.ensureRuntimeMarker(finalPath, metadata.version);
+        this.ready(metadata.version);
+        return;
+      } catch (error) {
+        const details = error instanceof Error ? error.message : String(error);
+        await this.options.logger.error(
+          `Discarding invalid managed Harness runtime ${metadata.version} before reinstall: ${details}`
+        );
+        await rm(finalPath, { recursive: true, force: true });
+      }
     }
 
     const stagingPath = await mkdtemp(join(runtimesRoot, `.install-${metadata.version}-`));
@@ -248,6 +266,8 @@ export class HarnessUpdater extends EventEmitter {
         progress: 0.86
       });
       await validateRuntime(stagingPath, metadata.version, this.options.nodeExecutable, this.options.logger, true);
+      await this.ensureRuntimeMarker(stagingPath, metadata.version);
+      await requireRuntimePlatformMetadata(stagingPath, this.expectedRuntimeMetadata(metadata.version));
       await rename(stagingPath, finalPath);
       await this.options.logger.info(`Installed managed Harness runtime ${metadata.version} at ${finalPath}`);
       this.ready(metadata.version);
@@ -271,6 +291,33 @@ export class HarnessUpdater extends EventEmitter {
   private runtimePath(version: string): string {
     assertSafeVersion(version);
     return join(this.options.userDataPath, "runtimes", version);
+  }
+
+  private expectedRuntimeMetadata(version: string): ExpectedRuntimeMetadata {
+    return {
+      platform: this.options.nodeIdentity.platform,
+      arch: this.options.nodeIdentity.arch,
+      nodeVersion: this.options.nodeIdentity.version,
+      harnessVersion: version
+    };
+  }
+
+  private async ensureRuntimeMarker(rootPath: string, version: string): Promise<void> {
+    const result = await ensureRuntimePlatformMetadata(rootPath, this.expectedRuntimeMetadata(version));
+    if (result.created) {
+      await this.options.logger.info(`Added runtime platform metadata for managed Harness ${version}`);
+    }
+  }
+
+  private async installedRuntimeIsCompatible(version: string): Promise<boolean> {
+    const rootPath = this.runtimePath(version);
+    if (!(await runtimeExists(rootPath))) return false;
+    try {
+      await requireRuntimePlatformMetadata(rootPath, this.expectedRuntimeMetadata(version));
+      return true;
+    } catch (error) {
+      return error instanceof RuntimeMetadataError && error.reason === "missing";
+    }
   }
 
   private setProgress(progress: number): void {
@@ -462,7 +509,8 @@ function runProcess(command: string, args: string[], options: RunProcessOptions)
       cwd: options.cwd,
       env: { ...process.env, ...options.environment },
       stdio: ["ignore", "pipe", "pipe"],
-      detached: process.platform !== "win32"
+      detached: process.platform !== "win32",
+      windowsHide: process.platform === "win32"
     });
     let stdout = "";
     let stderr = "";
@@ -473,9 +521,12 @@ function runProcess(command: string, args: string[], options: RunProcessOptions)
       stderr = appendLimited(stderr, chunk.toString());
     });
 
+    let timedOut = false;
     const timer = setTimeout(() => {
-      signalProcess(child, "SIGTERM");
-      setTimeout(() => signalProcess(child, "SIGKILL"), 2_000).unref();
+      timedOut = true;
+      void terminateProcessTree(child, { gracefulTimeoutMs: 2_000, forceTimeoutMs: 1_000 }).catch(
+        rejectPromise
+      );
     }, options.timeoutMs);
     child.once("error", (error) => {
       clearTimeout(timer);
@@ -483,20 +534,11 @@ function runProcess(command: string, args: string[], options: RunProcessOptions)
     });
     child.once("exit", (code, signal) => {
       clearTimeout(timer);
-      if (code === 0) resolvePromise({ stdout, stderr });
+      if (timedOut) rejectPromise(new Error(`命令执行超时（${options.timeoutMs}ms）。`));
+      else if (code === 0) resolvePromise({ stdout, stderr });
       else rejectPromise(new Error(`命令执行失败（code=${String(code)}, signal=${String(signal)}）：${stderr.trim()}`));
     });
   });
-}
-
-function signalProcess(child: ChildProcess, signal: NodeJS.Signals): void {
-  if (!child.pid) return;
-  try {
-    if (process.platform === "win32") child.kill(signal);
-    else process.kill(-child.pid, signal);
-  } catch {
-    child.kill(signal);
-  }
 }
 
 function appendLimited(current: string, next: string): string {

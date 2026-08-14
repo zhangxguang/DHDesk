@@ -1,30 +1,27 @@
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { access, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, cp, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { spawn } from "node:child_process";
+import {
+  nodeArchiveDirectory,
+  nodeArchiveName,
+  resolveRuntimeLayout
+} from "./runtime-platform.mjs";
 
 const projectRoot = resolve(import.meta.dirname, "..");
 const manifest = JSON.parse(await readFile(join(projectRoot, "resources/runtime-manifest.json"), "utf8"));
-const version = manifest.nodeVersion;
-const arch = process.arch;
-
-if (process.platform !== "darwin" || !["arm64", "x64"].includes(arch)) {
-  throw new Error(`Unsupported build host: ${process.platform}-${arch}. DHDesk currently targets macOS arm64.`);
-}
-
-const archiveName = `node-${version}-darwin-${arch}.tar.xz`;
+const version = requireVersion(manifest.nodeVersion, "nodeVersion");
+const layout = resolveRuntimeLayout(process.platform, process.arch);
+const archiveName = nodeArchiveName(version, layout);
 const baseUrl = `https://nodejs.org/dist/${version}`;
 const target = join(projectRoot, "resources/node");
-const existingNode = join(target, "bin/node");
+const existingNode = join(target, ...layout.nodeExecutableParts);
+const npmCli = join(target, ...layout.npmCliParts);
 
-try {
-  await access(existingNode);
-  await repairNodeBinLinks(target);
-  process.stdout.write(`Node runtime already exists at ${existingNode}\n`);
+if (await existingRuntimeIsValid()) {
+  process.stdout.write(`Node runtime ${version} for ${layout.target} already exists at ${existingNode}\n`);
   process.exit(0);
-} catch {
-  // Continue with a verified download.
 }
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), "dhdesk-node-"));
@@ -36,37 +33,76 @@ try {
   ]);
 
   if (!archiveResponse.ok || !sumsResponse.ok) {
-    throw new Error(`Unable to download Node.js ${version}.`);
+    throw new Error(
+      `Unable to download Node.js ${version} for ${layout.target} ` +
+        `(archive=${archiveResponse.status}, checksums=${sumsResponse.status}).`
+    );
   }
 
   const archive = Buffer.from(await archiveResponse.arrayBuffer());
-  const sums = await sumsResponse.text();
-  const expected = sums
-    .split("\n")
-    .map((line) => line.trim().split(/\s+/))
-    .find(([, file]) => file === archiveName)?.[0];
-
-  if (!expected) {
-    throw new Error(`Checksum for ${archiveName} was not published by Node.js.`);
-  }
-
+  const expected = findPublishedChecksum(await sumsResponse.text(), archiveName);
   const actual = createHash("sha256").update(archive).digest("hex");
-  if (actual !== expected) {
-    throw new Error(`Checksum mismatch for ${archiveName}.`);
-  }
+  if (actual !== expected) throw new Error(`Checksum mismatch for ${archiveName}.`);
 
   const archivePath = join(temporaryRoot, basename(archiveName));
-  await writeFile(archivePath, archive);
-  await run("tar", ["-xJf", archivePath, "-C", temporaryRoot]);
+  await writeFile(archivePath, archive, { mode: 0o600 });
+  await extractArchive(archivePath, temporaryRoot);
 
-  const extracted = join(temporaryRoot, `node-${version}-darwin-${arch}`);
+  const extracted = join(temporaryRoot, nodeArchiveDirectory(version, layout));
+  const extractedNode = join(extracted, ...layout.nodeExecutableParts);
+  const extractedNpmCli = join(extracted, ...layout.npmCliParts);
+  await Promise.all([access(extractedNode), access(extractedNpmCli)]);
+  await verifyNodeIdentity(extractedNode);
+
   await rm(target, { recursive: true, force: true });
-  await mkdir(target, { recursive: true });
   await cp(extracted, target, { recursive: true });
-  await repairNodeBinLinks(target);
-  process.stdout.write(`Prepared Node.js ${version} at ${target}\n`);
+  if (layout.platform === "darwin") await repairNodeBinLinks(target);
+  await Promise.all([access(existingNode), access(npmCli)]);
+  await verifyNodeIdentity(existingNode);
+  process.stdout.write(`Prepared Node.js ${version} for ${layout.target} at ${target}\n`);
+} catch (error) {
+  await rm(target, { recursive: true, force: true }).catch(() => undefined);
+  const details = error instanceof Error ? error.message : String(error);
+  throw new Error(`Failed to prepare Node.js on build host ${process.platform}-${process.arch}: ${details}`);
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
+}
+
+async function existingRuntimeIsValid() {
+  try {
+    await Promise.all([access(existingNode), access(npmCli)]);
+    if (layout.platform === "darwin") await repairNodeBinLinks(target);
+    await verifyNodeIdentity(existingNode);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function verifyNodeIdentity(nodeExecutable) {
+  const output = await runCapture(nodeExecutable, [
+    "-p",
+    "JSON.stringify({platform:process.platform,arch:process.arch,version:process.version})"
+  ]);
+  let identity;
+  try {
+    identity = JSON.parse(output.trim());
+  } catch {
+    throw new Error(`Node.js self-check returned invalid output from ${nodeExecutable}.`);
+  }
+  if (identity.platform !== layout.platform || identity.arch !== layout.arch || identity.version !== version) {
+    throw new Error(
+      `Node.js self-check mismatch: expected ${layout.target}/${version}, ` +
+        `received ${identity.platform}-${identity.arch}/${identity.version}.`
+    );
+  }
+}
+
+async function extractArchive(archivePath, destination) {
+  const args = layout.nodeArchiveFormat === "tar.xz"
+    ? ["-xJf", archivePath, "-C", destination]
+    : ["-xf", archivePath, "-C", destination];
+  await run("tar", args);
 }
 
 async function repairNodeBinLinks(nodeRoot) {
@@ -83,13 +119,53 @@ async function repairNodeBinLinks(nodeRoot) {
   }
 }
 
+function findPublishedChecksum(sums, fileName) {
+  const checksum = sums
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/))
+    .find(([, file]) => file === fileName)?.[0];
+  if (!checksum || !/^[0-9a-f]{64}$/i.test(checksum)) {
+    throw new Error(`Checksum for ${fileName} was not published by Node.js.`);
+  }
+  return checksum.toLowerCase();
+}
+
+function requireVersion(value, field) {
+  if (typeof value !== "string" || !/^[0-9A-Za-z][0-9A-Za-z.+-]*$/.test(value)) {
+    throw new Error(`resources/runtime-manifest.json contains an invalid ${field}.`);
+  }
+  return value;
+}
+
 function run(command, args) {
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, { stdio: "inherit" });
+    const child = spawn(command, args, { stdio: "inherit", windowsHide: process.platform === "win32" });
     child.once("error", rejectPromise);
     child.once("exit", (code) => {
       if (code === 0) resolvePromise();
       else rejectPromise(new Error(`${command} exited with code ${code ?? "unknown"}.`));
+    });
+  });
+}
+
+function runCapture(command, args) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(command, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: process.platform === "win32"
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.once("error", rejectPromise);
+    child.once("exit", (code) => {
+      if (code === 0) resolvePromise(stdout);
+      else rejectPromise(new Error(`${command} exited with code ${code ?? "unknown"}: ${stderr.trim()}`));
     });
   });
 }

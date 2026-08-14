@@ -11,11 +11,19 @@ extraResources:
     to: node/lib/node_modules/npm
     filter:
       - "**/*"
+      - "!**/*.d.ts"
+      - "!**/*.map"
+      - "!**/{test,tests,__tests__,example,examples}/**/*"
+      - "!**/{README,README.*,readme,readme.*,CHANGELOG,CHANGELOG.*,changelog,changelog.*,HISTORY,HISTORY.*,history,history.*,CONTRIBUTING,CONTRIBUTING.*,contributing,contributing.*}"
   # electron-builder skips a source directory named node_modules by default.
   - from: resources/bundled-runtime/node_modules
     to: bundled-runtime/node_modules
     filter:
       - "**/*"
+      - "!**/*.d.ts"
+      - "!**/*.map"
+      - "!**/{test,tests,__tests__,example,examples}/**/*"
+      - "!**/{README,README.*,readme,readme.*,CHANGELOG,CHANGELOG.*,changelog,changelog.*,HISTORY,HISTORY.*,history,history.*,CONTRIBUTING,CONTRIBUTING.*,contributing,contributing.*}"
       - "!node-pty/prebuilds/win32-*/**/*"
       - "!node-pty/prebuilds/linux-*/**/*"
       - "!node-pty/prebuilds/darwin-x64/**/*"

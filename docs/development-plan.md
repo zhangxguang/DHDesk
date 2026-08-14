@@ -1,53 +1,81 @@
-# DHDesk macOS 应用开发计划
+# DHDesk macOS / Windows 双平台开发计划
+
+> 目标平台：macOS 14+ arm64、Windows 10 22H2 / Windows 11 x64
+>
+> 当前版本：`0.1.0`
+>
+> 当前分支：`feature/windows-support`
+>
+> 最后同步：2026-08-14
+>
+> 状态依据：当前仓库源码、25 项自动化测试及 GitHub Actions 双平台成功构建
 
 ## 1. 项目概述
 
-DHDesk 是一个面向 macOS 的 DeepSeek Harness 桌面启动器。应用负责在后台启动并管理 DeepSeek Harness Web 服务，通过桌面窗口展示官方 Web UI，使用户无需手动执行命令或打开浏览器。
+DHDesk 是 DeepSeek Harness 的非官方桌面启动器和 Runtime 管理器。应用在后台启动并管理 DeepSeek Harness Web 服务，通过 Electron 窗口展示官方 Web UI，使用户无需手动执行命令或打开浏览器。
 
-应用同时提供独立的 DeepSeek Harness 版本管理能力，包括检查更新、下载安装、重启切换和失败回滚。
+DHDesk 同时提供独立的 Harness 版本管理能力，包括检查、下载、完整性校验、隔离验证、切换和失败回滚。Harness 更新与 DHDesk 自身更新相互独立。
 
 ### 1.1 核心目标
 
-- 用户双击 `.app` 即可使用 DeepSeek Harness。
-- 用户无需单独安装 Node.js、npm、pnpm 或 DeepSeek Harness。
-- 尽量不修改 DeepSeek Harness Web UI 和内部实现。
-- Harness 作为独立子进程运行，避免影响桌面应用稳定性。
-- 支持 Harness 独立升级，并在升级失败时自动回滚。
-- 保留现有 `~/.dsh` 配置、凭据、工作区和会话数据。
-- 支持 Developer ID 签名、公证和 DMG 分发。
+- [x] 同一套 Electron + TypeScript 代码支持 macOS arm64 和 Windows x64。
+- [x] 用户无需预装 Node.js、npm、pnpm 或 DeepSeek Harness。
+- [x] 双击应用即可启动 Harness Web UI，无需终端操作。
+- [x] Harness 作为独立子进程运行，避免影响 Electron 主进程稳定性。
+- [x] 应用内置目标平台原生 Node.js 和出厂 Harness Runtime。
+- [x] 支持 Harness 独立升级，并在新版本启动失败时自动回滚。
+- [x] 保留官方 `.dsh` 配置、凭据、工作区和会话数据。
+- [x] GitHub Actions 可分别生成 macOS DMG 和 Windows NSIS Setup EXE。
+- [ ] 生成完成正式签名、公证和安装验证的双平台发布包。
 
-### 1.2 非目标
+### 1.2 当前支持矩阵
 
-第一阶段不包含以下内容：
+| 平台 | 最低目标版本 | 架构 | 安装产物 | CI 构建 | 正式签名 |
+|---|---|---|---|---|---|
+| macOS | macOS 14 | arm64 | DMG | 已完成 | 未完成 Developer ID 公证流程 |
+| Windows | Windows 10 22H2 / Windows 11 | x64 | NSIS Setup EXE | 已完成 | 未完成 Authenticode 签名 |
 
-- 不重新开发或 Fork DeepSeek Harness Web UI。
-- 不将 Harness 直接集成到 Electron 主进程。
-- 不支持 Mac App Store 分发。
-- 不支持运行中无感热更新 Harness。
-- 不开发独立的模型配置、会话或工作区界面。
-- 不在第一版支持 Windows、Linux 和 Intel Mac。
-- 不在第一版提供第三方 Harness 插件市场。
+### 1.3 非目标
+
+当前版本不包含：
+
+- Intel Mac、Windows arm64 和 Linux。
+- Mac App Store、Microsoft Store 和 Windows portable 分发。
+- Fork 或重新开发 DeepSeek Harness Web UI。
+- 将 Harness 直接集成到 Electron 主进程。
+- 运行中无感热更新 Harness。
+- 独立的模型配置、会话或工作区界面。
+- Harness 插件市场。
+- 自动迁移或静默恢复 `.dsh` 用户数据。
 
 ## 2. 技术方案
 
 ### 2.1 技术选型
 
-| 模块 | 选型 | 说明 |
+| 模块 | 当前选型 | 状态 |
 |---|---|---|
-| 桌面框架 | Electron + TypeScript | 与 Web UI 兼容性高，便于管理 Node 子进程和应用升级 |
-| Web 容器 | Electron `BrowserWindow` | 加载 Harness 输出的本地 HTTP URL |
-| Harness Runtime | 独立 Node.js 进程 | 与 Electron 主进程隔离，便于重启和回滚 |
-| Node.js | 应用内置独立 Runtime | 不依赖用户系统环境，版本满足 Harness 要求 |
-| Harness 来源 | npm `@deepseek-ai/dsh` | 使用官方发布渠道进行安装和升级 |
-| 应用设置 | `electron-store` 或等价本地存储 | 保存激活版本、更新偏好和窗口状态 |
-| 应用自动升级 | `electron-updater` | 用于升级 DHDesk 自身，与 Harness 更新分离 |
-| 打包 | `electron-builder` | 生成签名、公证后的 DMG |
+| 桌面框架 | Electron 43 + TypeScript | 已实现 |
+| Web 容器 | Electron `BrowserWindow` | 已实现 |
+| Harness Runtime | 应用内置 Node.js 启动独立子进程 | 已实现 |
+| 出厂 Runtime | `@deepseek-ai/dsh@0.1.0-rc.6` | 已实现 |
+| Harness 更新 | npm Registry + 版本化 Runtime 目录 | 核心链路已实现 |
+| DHDesk 自更新 | 待选型，优先评估 `electron-updater` | 未实现 |
+| macOS 打包 | electron-builder DMG arm64 | 已实现未签名 CI 包 |
+| Windows 打包 | electron-builder NSIS x64 | 已实现未签名 CI 包 |
+| CI | GitHub Actions 原生双平台矩阵 | 已实现 |
+
+当前 Runtime 版本读取自 `resources/runtime-manifest.json`：
+
+| 组件 | 版本 |
+|---|---|
+| Node.js | `v24.19.0` |
+| DeepSeek Harness | `0.1.0-rc.6` |
 
 ### 2.2 总体架构
 
 ```mermaid
 flowchart LR
-    A["DHDesk Electron App"] --> B["Runtime Manager"]
+    A["DHDesk Electron App"] --> B["Runtime Locator"]
     B --> C["Bundled Node.js"]
     C --> D["DeepSeek Harness: dsh web"]
     D --> E["127.0.0.1 动态端口"]
@@ -58,449 +86,442 @@ flowchart LR
     H --> I["版本化 Runtime 目录"]
     I --> B
 
-    D --> J["~/.dsh 用户数据"]
+    D --> J["用户 .dsh 数据目录"]
 ```
 
 ### 2.3 核心设计原则
 
-1. **黑盒托管**：将 Harness 视为独立本地服务，只依赖 CLI 启动方式和服务 URL。
-2. **进程隔离**：Harness 崩溃或升级不应导致 Electron 主进程退出。
-3. **运行时与数据分离**：Harness 程序安装在 DHDesk 应用数据目录，用户数据继续存放在 `~/.dsh`。
-4. **版本化安装**：每个 Harness 版本安装到独立目录，不覆盖正在使用的版本。
-5. **原子切换**：只有新版本验证通过后才切换激活版本。
-6. **可恢复**：应用包内始终保留一个可用的出厂 Runtime。
-7. **最小权限暴露**：Web 服务只监听 `127.0.0.1`，不对局域网开放。
+1. **黑盒托管**：只依赖 Harness CLI 启动方式和本地服务 URL。
+2. **进程隔离**：Harness 崩溃或升级不直接导致 Electron 主进程退出。
+3. **运行时与数据分离**：DHDesk 管理程序 Runtime，Harness 用户数据继续使用官方 `.dsh`。
+4. **目标平台原生构建**：macOS 和 Windows 分别在对应原生 Runner 准备 Runtime 和打包。
+5. **版本化安装**：每个 Harness 版本安装到独立目录，不覆盖正在使用的版本。
+6. **原子切换与回滚**：新版本验证通过后才激活，启动失败时切回上一版本。
+7. **出厂兜底**：应用包始终内置一个与平台和架构匹配的可用 Runtime。
+8. **最小权限暴露**：Harness 仅监听 `127.0.0.1`，Renderer 不获得 Node.js 或命令执行权限。
 
-## 3. 目录规划
+## 3. 目录与 Runtime 约定
 
-### 3.1 项目源码目录
+### 3.1 当前源码目录
 
 ```text
 DHDesk/
+├── .github/workflows/build.yml
 ├── docs/
-│   └── development-plan.md
+│   ├── development-plan.md
+│   ├── windows-support-plan.md
+│   └── windows-support-requirements.md
 ├── src/
 │   ├── main/
 │   │   ├── app.ts
-│   │   ├── window-manager.ts
-│   │   ├── runtime-manager.ts
-│   │   ├── process-supervisor.ts
-│   │   ├── update-manager.ts
-│   │   ├── settings-store.ts
+│   │   ├── active-runtime.ts
+│   │   ├── harness-updater.ts
 │   │   ├── logging.ts
-│   │   └── security.ts
-│   ├── preload/
-│   │   └── index.ts
+│   │   ├── process-supervisor.ts
+│   │   ├── process-tree.ts
+│   │   ├── runtime-locator.ts
+│   │   ├── runtime-metadata.ts
+│   │   ├── runtime-platform.ts
+│   │   └── window-manager.ts
+│   ├── preload/index.ts
 │   ├── renderer/
-│   │   ├── startup.html
-│   │   ├── startup.ts
-│   │   └── startup.css
-│   └── shared/
-│       ├── contracts.ts
-│       └── errors.ts
+│   └── shared/contracts.ts
 ├── resources/
 │   ├── node/
 │   ├── bundled-runtime/
+│   ├── runtime-manifest.json
 │   ├── entitlements.mac.plist
 │   └── icons/
 ├── scripts/
-│   ├── prepare-node-runtime.ts
-│   ├── prepare-harness-runtime.ts
-│   ├── notarize.ts
-│   └── verify-package.ts
 ├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
+├── electron-builder.base.yml
+├── electron-builder.mac.yml
+├── electron-builder.win.yml
+└── package.json
+```
+
+### 3.2 构建期 Runtime 布局
+
+macOS：
+
+```text
+resources/node/
+├── bin/node
+├── bin/npm
+├── bin/npx
+└── lib/node_modules/npm/
+```
+
+Windows：
+
+```text
+resources/node/
+├── node.exe
+├── npm.cmd
+├── npx.cmd
+└── node_modules/npm/
+```
+
+业务运行时使用 `node[.exe] <npm-cli.js>` 调用 npm，不依赖 Windows shell 执行 `npm.cmd` 或 `npx.cmd`。
+
+两个平台的出厂 Harness 目录保持一致：
+
+```text
+resources/bundled-runtime/
 ├── package.json
-├── tsconfig.json
-└── electron-builder.yml
+├── package-lock.json
+├── runtime-platform.json
+└── node_modules/@deepseek-ai/dsh/
 ```
 
-### 3.2 用户机器目录
+`runtime-platform.json` 用于记录并校验平台、架构、Node.js 版本和 Harness 版本，避免跨平台 Runtime 混用。
 
-```text
-~/Library/Application Support/DHDesk/
-├── runtimes/
-│   ├── <version>/
-│   │   ├── node_modules/
-│   │   ├── package.json
-│   │   └── package-lock.json
-│   └── ...
-├── downloads/
-├── backups/
-├── logs/
-├── active-runtime.json
-└── settings.json
+### 3.3 用户机器目录
 
-~/.dsh/
-├── profiles/
-├── settings.yaml
-├── .credentials.yaml
-└── 其他 Harness 用户数据
-```
+| 用途 | macOS | Windows |
+|---|---|---|
+| DHDesk 应用数据 | `~/Library/Application Support/DHDesk/` | `%APPDATA%\DHDesk\` |
+| Harness 用户数据 | `~/.dsh/` | `%USERPROFILE%\.dsh\` |
 
-约束：
+应用数据目录包含版本化 Runtime、下载临时目录、激活版本记录和更新状态。安装、升级和默认卸载均不得删除 `.dsh`。
 
-- 不修改 `.app` 内的 Runtime，避免破坏代码签名。
-- 不将 API Key 写入 DHDesk 设置或日志。
-- 不删除 `~/.dsh`，卸载 DHDesk 时默认保留用户数据。
+## 4. 桌面应用功能状态
 
-## 4. 功能需求
+### 4.1 启动与 Runtime 定位
 
-### 4.1 应用启动
-
-- [ ] 应用只允许一个实例运行。
-- [ ] 启动时显示本地加载页，而不是空白窗口。
-- [ ] 检查当前激活的 Harness Runtime 是否完整。
-- [ ] 激活版本不可用时使用应用内置版本。
-- [ ] 使用内置 Node.js 启动 Harness 子进程。
-- [ ] 通过 `--host 127.0.0.1 --port 0` 使用本机动态端口。
-- [ ] 捕获并解析 Harness 输出的服务 URL。
-- [ ] 服务准备完成后加载官方 Web UI。
-- [ ] 启动超时或失败时展示可读错误及日志入口。
-
-建议启动命令结构：
-
-```text
-<bundled-node> <runtime>/node_modules/@deepseek-ai/dsh/lib/bin.js web \
-  --host 127.0.0.1 \
-  --port 0
-```
+- [x] 应用只允许一个实例运行，第二次启动聚焦现有窗口。
+- [x] 启动时显示本地加载页，失败时显示错误详情和重试入口。
+- [x] 检查当前激活 Runtime 的完整性、平台、架构和版本元数据。
+- [x] 管理 Runtime 不可用时回退到应用内置版本。
+- [x] 使用应用内置 Node.js 启动 Harness。
+- [x] 使用 `--host 127.0.0.1 --port 0` 分配 loopback 动态端口。
+- [x] 解析 Harness 输出 URL，并执行 HTTP 健康检查。
+- [x] 服务就绪后加载官方 Web UI。
+- [x] macOS 和 Windows 使用各自原生 Node/npm 路径布局。
+- [x] 旧版无平台标记的可用 Runtime 经过校验后自动补写标记。
 
 ### 4.2 Harness 进程管理
 
-- [ ] 保存子进程 PID、版本、启动时间和服务 URL。
-- [ ] 分别捕获 `stdout` 和 `stderr` 并写入滚动日志。
-- [ ] Harness 异常退出时显示错误页面。
-- [ ] 提供“重新启动 Harness”操作。
-- [ ] 限制连续自动重启次数，防止崩溃循环。
-- [ ] 应用退出时向 Harness 发送 `SIGTERM`。
-- [ ] 等待最多 5 秒完成优雅退出。
-- [ ] 超时后再执行强制终止。
-- [ ] 确保应用退出后没有遗留端口和子进程。
+- [x] 跟踪子进程生命周期、Harness 版本和服务 URL。
+- [x] 分别捕获 `stdout`、`stderr` 并写入限制大小的日志文件。
+- [x] Harness 启动失败或异常退出时更新错误状态。
+- [x] 提供“重新启动 Harness”菜单操作。
+- [x] macOS 使用独立进程组，先发送 `SIGTERM`，超时后发送 `SIGKILL`。
+- [x] Windows 隐藏 Node/npm 控制台窗口，并使用 `taskkill /T` 结束完整进程树。
+- [x] 正常停止最多等待 5 秒，超时后执行强制终止。
+- [x] 更新安装和冒烟测试进程复用统一进程树清理逻辑。
+- [ ] 增加有限次数的 Harness 自动重启策略，防止崩溃循环。
+- [ ] 在真实 Windows 环境验证退出后没有遗留 `node.exe`、`conhost.exe` 或 Harness 子进程。
 
-### 4.3 Web 窗口
+Windows 上 `child.kill("SIGTERM")` 不等同于 Unix 优雅退出；当前实现以终止完整进程树和避免残留为目标，不承诺 Harness 一定执行信号清理逻辑。
 
-- [ ] 仅允许主窗口加载当前 Harness 的 loopback URL。
-- [ ] 外部 HTTP/HTTPS 链接使用系统默认浏览器打开。
-- [ ] 阻止新窗口加载不可信本地页面。
-- [ ] 禁用 Renderer 的 Node.js 集成。
-- [ ] 开启 Context Isolation。
-- [ ] 使用最小化 preload API。
-- [ ] 支持复制、粘贴、下载和常用快捷键。
-- [ ] 保存和恢复窗口尺寸及位置。
-- [ ] 支持 Harness 页面刷新，但不重复启动服务。
+### 4.3 Web 窗口与平台界面
 
-### 4.4 工作区与数据
+- [x] 主窗口只允许加载当前 Harness loopback Origin。
+- [x] 外部 HTTP/HTTPS 链接交给系统默认浏览器。
+- [x] 阻止新窗口、WebView 和未授权导航。
+- [x] `nodeIntegration: false`、`contextIsolation: true`、`sandbox: true`。
+- [x] preload 仅暴露固定 IPC 操作。
+- [x] 刷新 Harness 页面不会重复启动服务。
+- [x] macOS 和 Windows 使用各自有效的应用菜单。
+- [x] 更新窗口的 macOS 标题栏按钮逻辑具有平台保护。
+- [ ] 保存并恢复主窗口尺寸和位置。
+- [ ] 明确处理 Web UI 下载行为和下载完成提示。
+- [ ] 在 Windows 100%、125%、150%、200% 显示缩放下验收布局和点击位置。
 
-- [ ] 复用 Harness 自带的 macOS 原生目录选择器。
-- [ ] 默认复用官方 `~/.dsh` 数据目录。
-- [ ] 重启应用后保留模型配置、工作区和会话。
-- [ ] 更新 Runtime 不覆盖 `~/.dsh`。
-- [ ] 日志中脱敏用户目录、API Key 和环境变量。
+### 4.4 工作区、数据和诊断
 
-### 4.5 状态和诊断界面
-
-- [ ] 显示 DHDesk 版本。
-- [ ] 显示当前 Harness 版本。
-- [ ] 显示 Node.js Runtime 版本。
-- [ ] 显示 Harness 运行状态和本地 URL。
-- [ ] 提供打开日志目录操作。
-- [ ] 提供复制诊断信息操作，默认排除敏感信息。
-- [ ] 提供重启 Harness 操作。
+- [x] 默认复用 Harness 官方 `.dsh` 数据目录。
+- [x] 更新 Runtime 不覆盖 `.dsh`。
+- [x] 日志文件使用仅当前用户可读权限。
+- [x] 日志脱敏常见 API Key、Bearer Token、token 和 secret 字段。
+- [x] 提供打开日志目录操作。
+- [x] 提供重启 Harness 操作。
+- [ ] 在双平台人工验证工作区选择、文件读写和 Shell 工具。
+- [ ] 日志进一步脱敏用户目录和敏感环境变量值。
+- [ ] 提供复制诊断信息操作，并明确列出和脱敏复制字段。
+- [ ] 增加独立状态页，统一显示 DHDesk、Harness、Node.js 版本和运行状态。
+- [ ] 保存和恢复窗口状态及其他用户偏好。
 
 ## 5. Harness 更新系统
 
-### 5.1 更新策略
+Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打开更新窗口并确认后执行检查、安装或重启，不静默下载和切换 Runtime。
 
-Harness 更新与 DHDesk 应用更新完全分离。Harness 更新来源为官方 npm Registry 包 `@deepseek-ai/dsh`。
+### 5.1 检查更新
 
-当前实现使用 npm `latest` 作为手动更新通道。DHDesk 不会静默下载、安装或重启 Harness；只有用户在更新窗口确认后才执行对应操作。
+- [x] 从 npm Registry 查询 `@deepseek-ai/dsh` 的 `latest` 版本。
+- [x] 提供手动“检查 Harness 更新”操作和跨平台快捷键。
+- [x] 展示当前版本、目标版本和预发布版本号。
+- [x] 网络不可用时保留并继续使用当前 Runtime。
+- [x] 不向更新服务发送本地配置、凭据或设备路径。
+- [ ] 增加启动后异步检查和检查频率限制。
+- [ ] 增加稳定版、RC/Beta 预览版更新通道选择。
 
-支持两种更新通道：
-
-- **稳定通道**：只接收 npm `latest` 中的稳定版本。
-- **预览通道**：允许安装 `rc`、`beta` 等预发布版本。
-
-在 Harness 尚未发布稳定版本时，默认使用预览通道，但不得静默自动安装。
-
-### 5.2 检查更新
-
-- [ ] 启动后异步检查更新，不阻塞 Harness 启动。
-- [x] 提供手动“检查更新”操作。
-- [ ] 设置检查频率，避免每次窗口激活都请求 Registry。
-- [x] 展示当前版本和目标版本；预发布标识保留在版本号中。
-- [x] 网络不可用时继续使用当前 Runtime。
-- [x] 不将本地配置、凭据或设备路径发送到更新服务。
-
-### 5.3 下载与安装
+### 5.2 下载、安装与验证
 
 - [x] 下载到独立临时目录。
 - [x] 校验 npm 元数据中的 SHA-512 integrity。
-- [x] 使用应用内置 Node.js/npm 安装完整生产依赖。
+- [x] 使用应用内置 Node.js 和 npm 安装完整生产依赖。
 - [x] 生成并保留 `package-lock.json`。
 - [x] 禁止覆盖现有版本目录。
-- [x] 校验版本目录名，安装归档交由 npm 安全解包。
-- [x] 限制下载大小和安装超时时间。
+- [x] 校验版本号、目录名和下载大小。
+- [x] 设置下载、安装和验证超时。
 - [x] 安装失败时清理临时目录，不影响当前版本。
+- [x] 执行 `dsh --version` 验证目标版本。
+- [x] 使用临时 `DSH_HOME` 启动 Web 服务并执行 HTTP 健康检查。
+- [x] 写入并再次校验 `runtime-platform.json`。
+- [x] 验证结束后停止进程并删除临时测试数据。
 
-### 5.4 安装后验证
+### 5.3 切换与回滚
 
-切换版本前必须完成以下检查：
+- [x] 安装完成后由用户选择“重启并使用”或稍后处理。
+- [x] 切换前记录上一可用 Runtime。
+- [x] 原子写入激活版本记录。
+- [x] 新版本启动失败时自动切回上一版本或出厂版本。
+- [x] 保留已安装旧版本和应用内置版本。
+- [ ] 更新前备份 `.dsh` 关键数据，并提示可能的数据格式迁移风险。
+- [ ] 提供用户确认的数据恢复流程，避免覆盖升级后新建内容。
+- [ ] 实现旧版本和下载缓存清理策略。
+- [ ] 提供手动选择和删除已安装 Harness 版本的高级界面。
+- [ ] 增加断网、损坏包、安装超时和回滚失败的故障注入测试。
 
-- [x] Runtime 目录结构完整。
-- [x] `dsh --version` 返回目标版本。
-- [x] 使用临时 `DSH_HOME` 启动 `dsh web`。
-- [x] 服务能在规定时间内输出 URL。
-- [x] 对首页执行 HTTP 健康检查并获得成功响应。
-- [x] 正常发送 `SIGTERM` 并确认进程退出。
-- [x] 验证完成后删除临时测试数据。
+## 6. 双平台 Runtime、打包与 CI
 
-### 5.5 切换和回滚
+### 6.1 Runtime 平台化
 
-```mermaid
-flowchart TD
-    A["发现新版本"] --> B["下载到临时目录"]
-    B --> C["校验并安装"]
-    C --> D["隔离环境冒烟测试"]
-    D -->|失败| E["删除临时版本并保留当前版本"]
-    D -->|成功| F["等待用户确认重启"]
-    F --> G["停止当前 Harness"]
-    G --> H["备份必要的 DSH Home 数据"]
-    H --> I["原子切换激活版本"]
-    I --> J["启动并健康检查"]
-    J -->|失败| K["切回旧版本"]
-    J -->|成功| L["完成升级"]
-```
+- [x] Node 准备脚本只接受 `darwin-arm64` 和 `win32-x64` 原生目标。
+- [x] macOS 下载官方 `.tar.xz`，Windows 下载官方 `.zip`。
+- [x] 读取 Node 官方 `SHASUMS256.txt` 并校验 SHA-256。
+- [x] 校验目标 Node 的平台、架构和版本。
+- [x] Harness 准备脚本根据平台解析 Node 和 npm CLI 路径。
+- [x] Harness 只能使用项目内置 Node/npm，不回退到系统 Node。
+- [x] 在目标平台原生安装并验证 Harness 与原生依赖。
+- [x] 生成并校验 Runtime 平台元数据。
+- [x] Runtime Locator 覆盖开发和打包后的 macOS/Windows 路径。
+- [x] 已添加跨平台路径、元数据和进程管理单元测试。
 
-- [x] 不强制重启；安装完成后由用户决定何时切换。
-- [x] 更新完成后提供“重启并使用”，关闭窗口即为稍后处理。
-- [x] 切换前记录上一个可用版本。
-- [ ] 新版本首次启动前备份 `~/.dsh` 关键数据。
-- [x] 新版本启动失败时自动切回上一个版本。
-- [x] 保留已安装的旧版本，并始终保留应用内置版本。
-- [ ] 提供手动选择已安装版本的高级功能。
+### 6.2 打包配置
 
-注意：如果新版本迁移了 `~/.dsh` 数据格式，只回滚 Runtime 可能不足。数据恢复必须由用户确认，避免覆盖升级后创建的新会话。
+- [x] 公共配置拆分到 `electron-builder.base.yml`。
+- [x] macOS 和 Windows 配置通过 `extends` 继承公共配置。
+- [x] macOS 只包含 arm64 Runtime 和原生模块。
+- [x] Windows 只包含 x64 Runtime 和原生模块。
+- [x] 打包时排除类型声明、Source Map、README/CHANGELOG、测试和示例文件，减少安装落盘文件数量。
+- [x] 配置蓝鲸飞船应用图标的 ICNS、ICO 和 PNG 资源。
+- [x] 生成 `DHDesk-<version>-mac-arm64.dmg`。
+- [x] 生成 `DHDesk-<version>-win-x64-setup.exe`。
+- [x] 为 DMG 和 EXE 生成 SHA-256 校验文件。
+- [x] 打包命令显式使用 `--publish never`，构建 Artifact 时不隐式创建 GitHub Release。
 
-## 6. 安全要求
+### 6.3 Windows NSIS
 
-### 6.1 本地服务安全
+- [x] 当前用户安装，不默认要求管理员权限。
+- [x] 创建桌面和开始菜单快捷方式。
+- [x] 使用固定 `appId` 支持同产品覆盖安装。
+- [x] 卸载时保留 DHDesk 应用数据和 `.dsh` 用户数据。
+- [x] 不捆绑额外下载器或系统服务。
+- [ ] 验证安装目录、用户名和工作区包含中文及空格的场景。
+- [ ] 确认正式版使用 one-click 还是 assisted 安装模式。
 
-- [ ] Harness 只监听 `127.0.0.1`。
-- [ ] 不允许通过设置切换为 `0.0.0.0`。
-- [ ] 不在 UI 中暴露可复制给远程设备的服务地址。
-- [ ] 主窗口导航采用 URL 白名单。
-- [ ] 拦截未知协议和非预期重定向。
+### 6.4 GitHub Actions
 
-### 6.2 Electron 安全
+- [x] 使用 `macos-14` arm64 和 `windows-2022` x64 原生 Runner。
+- [x] 每个 Job 显式断言平台和架构。
+- [x] Runtime 缓存按 OS、架构和 Runtime Manifest 隔离。
+- [x] 两个平台执行 `npm ci`、Runtime 准备、类型检查和测试。
+- [x] 两个平台成功构建安装包和 SHA-256 文件。
+- [x] 上传 `DHDesk-mac-arm64` 和 `DHDesk-win-x64` Artifacts。
+- [x] CI 构建显式禁用隐式发布和证书自动发现。
+- [ ] 更新 GitHub Actions 依赖，消除旧 Node.js Action Runtime 警告。
+- [ ] 增加安装包内容、启动和签名状态自动验证。
+- [ ] Tag 构建正式签名产物，并在双平台验证通过后创建 GitHub Release。
 
-- [ ] `nodeIntegration: false`。
-- [ ] `contextIsolation: true`。
-- [ ] `sandbox: true`，仅针对 Renderer；不启用 macOS App Sandbox。
-- [ ] preload 不提供任意命令执行能力。
-- [ ] IPC 接口使用固定 schema 校验参数。
-- [ ] 禁止 Renderer 直接控制 Harness 子进程。
-- [ ] 禁止 Renderer 任意读写本地文件。
+## 7. 安全与正式发布
 
-### 6.3 凭据和日志
+### 7.1 本地服务和 Electron 安全
 
-- [ ] DHDesk 不读取或缓存 `~/.dsh/.credentials.yaml` 内容。
-- [ ] 日志过滤常见 Token、Authorization Header 和环境变量值。
-- [ ] 崩溃报告默认不包含 Harness 完整输出。
-- [ ] 更新备份包含凭据时使用仅当前用户可读权限。
-- [ ] “复制诊断信息”明确列出将复制的字段。
+- [x] Harness 只监听 `127.0.0.1`，不提供切换到 `0.0.0.0` 的设置。
+- [x] 主窗口采用当前 Harness Origin 白名单。
+- [x] 拦截未知协议、非预期重定向、新窗口和 WebView。
+- [x] Renderer 禁用 Node.js 集成并启用 Context Isolation 和 Sandbox。
+- [x] Renderer 不能直接控制子进程或任意读写文件。
+- [x] IPC Handler 校验调用页面，只允许固定本地页面调用敏感操作。
+- [ ] 为 IPC 参数增加统一 schema 校验机制。
+- [ ] 完成 OAuth、下载、剪贴板和外部协议的专项安全测试。
 
-### 6.4 发布安全
+### 7.2 macOS 发布
 
-- [ ] 对 Electron App、Node sidecar 和嵌套原生二进制完成签名。
-- [ ] 启用 Hardened Runtime。
-- [ ] 配置 Node/V8 所需的 JIT entitlement。
+- [x] 配置 Hardened Runtime 和 entitlements。
+- [x] 生成内部测试 DMG 和 SHA-256 文件。
+- [ ] 使用 Developer ID Application 证书递归签名 App、Node sidecar 和嵌套原生二进制。
 - [ ] 完成 Apple Notarization 和 Stapling。
-- [ ] 发布包中包含 DeepSeek Harness、Electron、Node.js 及第三方许可证。
-- [ ] 产品命名和图标避免暗示为 DeepSeek 官方应用。
+- [ ] 通过 `codesign --verify --deep --strict`、`spctl` 和 Gatekeeper 验证。
+- [ ] 在无开发环境的干净 Mac 上验证安装、运行和 Harness 更新。
 
-## 7. 开发阶段
+现有本机构建曾使用 Apple Development 证书签名，但这不等同于 Developer ID 正式分发签名。当前 GitHub Actions DMG 明确为未签名 Artifact。
 
-### 阶段 0：技术验证
+### 7.3 Windows 发布
 
-目标：验证最关键的打包和运行链路。
+- [x] 生成未签名 NSIS x64 内测安装包和 SHA-256 文件。
+- [ ] 确认 OV/EV 代码签名证书或 Azure Trusted Signing 方案。
+- [ ] 签名主 EXE、Node sidecar、Helper、原生二进制和 NSIS 安装器。
+- [ ] 使用可信时间戳服务并验证 Authenticode 状态。
+- [ ] 完成 Windows Defender、SmartScreen 和常见企业杀毒软件验证。
+- [ ] 在干净 Windows 10/11 上验证安装、覆盖升级、卸载和数据保留。
 
-- [x] 初始化 Electron + TypeScript 工程。
-- [x] 下载并内置兼容版本的 Node.js。
-- [x] 构建一个固定版本的 Harness Runtime。
-- [x] 从 Electron 主进程启动 `dsh web`。
-- [x] 解析动态端口并在 BrowserWindow 中加载 Web UI。
-- [x] 验证模型设置页面可用。
-- [ ] 验证 macOS 原生工作区选择器可打开（控件已确认，原生对话框仍需人工验收）。
-- [ ] 验证 Agent 可以读取文件、修改文件和运行 Shell（需要用户配置有效模型凭据）。
-- [x] 验证退出应用后 Harness 进程正常结束。
-- [x] 对未公证包进行本机打包测试。
+### 7.4 共同发布要求
 
-交付物：可双击运行的内部测试 `.app`。
+- [ ] 发布包包含 Electron、Node.js、DeepSeek Harness 和第三方依赖许可证。
+- [ ] 提供隐私说明，明确 DHDesk 不收集或上传 `.dsh` 凭据。
+- [ ] 签名凭据只通过 CI Secret 或受控签名服务提供。
+- [ ] GitHub Release 同时发布 DMG、EXE 和对应 SHA-256 文件。
+- [ ] 产品描述明确 DHDesk 为非官方工具，避免暗示 DeepSeek 官方背书。
 
-验收标准：不安装系统 Node.js，也能完整启动并使用 Harness Web UI。
+## 8. 开发阶段与里程碑
 
-### 阶段 1：桌面应用 MVP
+| 阶段 | 内容 | 当前状态 | 剩余重点 |
+|---|---|---|---|
+| 阶段 0 | Electron、内置 Node/Harness、Web UI 技术验证 | 已完成 | 工作区与 Agent 能力人工回归 |
+| 阶段 1 | 桌面启动、进程、窗口和安全 MVP | 核心完成 | 窗口状态、诊断、下载、自动重启限制 |
+| 阶段 2 | Harness 检查、安装、切换和回滚 | 核心完成 | 备份提示、清理策略、故障注入测试 |
+| 阶段 3 | macOS/Windows Runtime 和安装包 | 已完成内测构建 | 双平台真实机器安装与功能验收 |
+| 阶段 4 | 双平台 CI Artifact | 已完成 | 包内容验证、Action 版本升级 |
+| 阶段 5 | 正式签名、公证和 Release | 未完成 | Developer ID、公证、Windows 签名、Release |
+| 阶段 6 | DHDesk 自更新和增强 | 未开始 | 自更新、版本管理页、菜单栏模式 |
 
-目标：完成可靠的日常启动和进程管理。
+### 8.1 下一阶段优先级
 
-- [ ] 实现单实例控制。
-- [ ] 实现启动页、错误页和重试操作。
-- [ ] 实现 Runtime 解析和出厂版本回退。
-- [ ] 实现 Harness 进程状态机。
-- [ ] 实现日志轮转和日志目录入口。
-- [ ] 实现窗口状态恢复。
-- [ ] 实现外部链接和下载处理。
-- [ ] 实现安全导航和 preload 边界。
-- [ ] 验证 `~/.dsh` 数据跨重启保持。
-- [ ] 添加单元测试和基础集成测试。
+1. 在干净 Windows 10/11 和 macOS 14+ 机器完成安装、启动、退出和 Harness 更新验收。
+2. 完成窗口状态恢复、诊断信息复制、下载处理和完整日志脱敏。
+3. 增加 Harness 更新失败、损坏包、断网和进程残留测试。
+4. 建立 macOS Developer ID 签名、公证以及 Windows Authenticode 签名流水线。
+5. 将验证通过的 DMG、EXE 和校验文件发布到 GitHub Releases。
+6. 再开始 DHDesk 自身自动更新和已安装 Harness 版本管理页。
 
-交付物：具备稳定启动、运行、重启和关闭能力的 MVP。
+## 9. 测试计划与当前覆盖
 
-### 阶段 2：Harness 更新与回滚
+### 9.1 已有自动化测试
 
-目标：让用户不通过命令行升级 Harness。
+当前共有 6 个测试文件、25 项测试，覆盖：
 
-- [x] 实现 npm 版本查询和 `latest` 更新通道。
-- [x] 实现下载、integrity 校验和安装进度。
-- [x] 实现版本化 Runtime 目录。
-- [x] 实现安装后隔离冒烟测试。
-- [x] 实现原子激活版本切换。
-- [x] 实现更新等待和重启确认。
-- [x] 实现启动失败自动回滚。
-- [ ] 实现旧版本清理策略。
-- [ ] 实现数据备份和恢复提示。
-- [ ] 添加断网、损坏包、安装失败和回滚测试。
+- [x] 激活 Runtime 原子写入、确认和回滚。
+- [x] Harness 更新状态、版本检查、安装和错误处理。
+- [x] 日志 API Key 和 Bearer Token 脱敏。
+- [x] Harness URL 解析、启动健康检查和进程停止。
+- [x] macOS/Windows Runtime 路径解析和回退。
+- [x] Runtime 平台元数据读写和不匹配拒绝。
+- [x] Windows `taskkill` 参数与平台化进程树逻辑。
 
-核心更新链路已于 2026-08-14 完成，并通过真实 npm 包下载安装、版本检查、隔离 Web 启动和界面联调。旧版本清理、数据备份提示及更完整的故障注入测试作为后续增强，不阻塞应用内升级。
+### 9.2 待补自动化测试
 
-交付物：支持检查、安装、切换和回滚 Harness 的版本管理功能。
+- [ ] Harness 崩溃后的 UI 状态和自动重启限制。
+- [ ] 更新下载中断、损坏包、npm 安装超时和回滚失败。
+- [ ] 日志中的用户目录、环境变量和更多 Token 格式脱敏。
+- [ ] 导航白名单、外部链接、下载和 IPC 来源校验。
+- [ ] 打包资源过滤、Runtime 平台和架构一致性。
+- [ ] 安装包解包后的 Node、Harness、图标和许可证完整性。
+- [ ] Windows 和 macOS 应用启动、退出及进程残留端到端测试。
 
-### 阶段 3：签名、公证和发布
+### 9.3 双平台人工验收
 
-目标：生成可在其他 Mac 安全安装的正式版本。
+macOS：
 
-- [ ] 配置 Electron Builder。
-- [ ] 配置 Apple Developer ID 证书。
-- [ ] 签名所有嵌套二进制。
-- [ ] 完成 Hardened Runtime entitlement。
-- [ ] 自动执行 Notarization 和 Stapling。
-- [ ] 生成 DMG 和校验文件。
-- [ ] 在一台干净 Mac 上进行安装测试。
-- [ ] 验证 Gatekeeper 无警告启动。
-- [ ] 验证无开发环境时 Harness 更新可用。
-- [ ] 整理开源许可证和隐私说明。
+- [ ] macOS 14 arm64 和当前最新稳定版 macOS arm64。
+- [ ] 无系统 Node/npm/pnpm 的干净用户环境。
+- [ ] 工作区选择、文件读写、Shell、会话保持和 Harness 更新。
+- [ ] DMG 挂载、拖拽安装、签名、公证和 Gatekeeper。
 
-交付物：签名、公证并可分发的 DMG。
+Windows：
 
-### 阶段 4：DHDesk 自更新和增强
+- [ ] Windows 10 22H2 x64 和 Windows 11 x64。
+- [ ] 无系统 Node/npm/pnpm 的干净用户环境。
+- [ ] 中文及空格路径、非管理员用户和覆盖安装。
+- [ ] 100%、125%、150%、200% 显示缩放和点击位置。
+- [ ] 工作区选择、文件读写、Shell、会话保持和 Harness 更新。
+- [ ] 退出、卸载、进程残留、Defender 和 SmartScreen。
 
-该阶段不阻塞 Harness 升级功能。
+共同故障场景：
 
-- [ ] 接入 DHDesk 自身自动更新。
-- [ ] 增加菜单栏运行模式。
-- [ ] 增加 Harness 已安装版本管理页。
-- [ ] 增加更新历史和失败原因展示。
-- [ ] 评估 Intel Mac 支持。
-- [ ] 评估稳定版 Harness 发布后的通道迁移。
+- [ ] 断网时使用已安装或出厂 Runtime 启动。
+- [ ] 更新中断或安装失败不破坏当前版本。
+- [ ] 新版本启动失败时自动回滚。
+- [ ] `.dsh` 数据在更新、覆盖安装和卸载后仍保留。
 
-## 8. 测试计划
+## 10. 正式版验收标准
 
-### 8.1 单元测试
+### 10.1 共同标准
 
-- Runtime 路径解析和版本比较。
-- Harness stdout URL 解析。
-- 进程状态机和重启限制。
-- npm integrity 校验。
-- 激活版本原子切换。
-- 日志和诊断信息脱敏。
-- 导航白名单和外部链接判断。
-
-### 8.2 集成测试
-
-- 使用内置 Node 启动 Harness。
-- 动态端口分配和首页健康检查。
-- `SIGTERM` 优雅退出。
-- Harness 崩溃后的 UI 状态和重启。
-- 当前 Runtime 损坏时回退到内置版本。
-- 更新安装失败时保持当前版本。
-- 新版本启动失败时自动回滚。
-- `~/.dsh` 在不同 Runtime 版本之间保持可见。
-
-### 8.3 端到端测试
-
-- 首次安装并启动应用。
-- 添加工作区并创建会话。
-- 配置模型并发送消息。
-- 执行文件读取、修改和 Shell 命令。
-- 关闭并重新打开应用后继续会话。
-- 检查并安装 Harness 更新。
-- 重启后确认目标版本运行。
-- 模拟升级失败并确认旧版本恢复。
-- 断网状态下正常使用已安装版本。
-- 卸载 DHDesk 后确认用户数据仍被保留。
-
-### 8.4 发布验证环境
-
-- macOS 14 Apple Silicon。
-- macOS 15 Apple Silicon。
-- macOS 当前最新稳定版 Apple Silicon。
-- 无系统 Node.js、npm 和 pnpm 的干净用户环境。
-- 有既存 `~/.dsh` 的升级环境。
-- 网络受限和完全离线环境。
-
-## 9. 验收标准
-
-正式版必须满足：
-
-- [ ] 双击 App 后无需终端操作即可进入 Harness Web UI。
-- [ ] 用户机器不需要预装 Node.js。
-- [ ] 首次启动、普通重启和系统重启后的启动均可靠。
+- [ ] 双击应用后无需终端即可进入 Harness Web UI。
+- [ ] 用户机器无需预装 Node.js、npm、pnpm 或 Harness。
+- [ ] 首次启动、普通重启和系统重启后均能可靠启动。
 - [ ] 工作区选择、文件编辑和 Shell 工具正常工作。
-- [ ] 关闭 App 后不存在遗留 Harness 进程。
-- [ ] 更新失败不会破坏当前可用版本。
-- [ ] 新版本无法启动时能自动回滚。
-- [ ] 离线状态仍能启动已安装 Runtime。
-- [ ] 现有 `~/.dsh` 数据不会被安装或更新流程覆盖。
-- [ ] App 通过 Apple 签名、公证和 Gatekeeper 验证。
-- [ ] 主窗口无法导航到未授权本地服务或任意外部页面。
-- [ ] 日志和诊断数据不包含明文 API Key。
+- [ ] 关闭应用后没有遗留 Harness、Node 或控制台进程。
+- [ ] Harness 更新失败不会破坏当前可用版本。
+- [ ] 新版本无法启动时自动回滚。
+- [ ] 离线状态仍能启动已安装或出厂 Runtime。
+- [ ] `.dsh` 数据不会被安装、更新或默认卸载流程覆盖。
+- [ ] 主窗口不能导航到未授权本地服务或任意外部页面。
+- [ ] 日志和诊断数据不包含明文 API Key 或敏感凭据。
 
-## 10. 风险与应对
+### 10.2 macOS 标准
+
+- [x] CI 可生成 arm64 DMG 和 SHA-256 文件。
+- [ ] App 及所有嵌套可执行文件使用 Developer ID Application 签名。
+- [ ] 发布 DMG 完成公证和 Stapling，并通过 Gatekeeper。
+- [ ] 在干净 Mac 上完成安装、启动和 Harness 更新验收。
+
+### 10.3 Windows 标准
+
+- [x] CI 可生成 x64 NSIS Setup EXE 和 SHA-256 文件。
+- [ ] 在干净 Windows 10/11 完成安装、启动、覆盖升级和卸载验收。
+- [ ] 正式发布包完成 Authenticode 签名并使用可信时间戳。
+- [ ] 中文路径、高 DPI、进程清理和 `.dsh` 数据保持测试通过。
+
+## 11. 风险与应对
 
 | 风险 | 影响 | 应对措施 |
 |---|---|---|
-| Harness 仍处于开发者预览 | CLI、配置或数据格式可能破坏兼容 | 锁定版本、隔离安装、冒烟测试、保留旧版本和数据备份 |
-| npm 包依赖版本漂移 | 同一顶层版本可能解析出不同依赖集合 | 保存 lockfile、校验 integrity、安装后完整冒烟测试 |
-| App 退出时 Agent 正在工作 | 文件操作或会话写入可能中断 | 退出确认、SIGTERM 优雅停止、等待超时后才强制终止 |
-| 新版本迁移 `~/.dsh` | 单纯回滚程序可能无法恢复 | 更新前快照、数据恢复需用户确认 |
-| Node 或原生依赖签名不完整 | Gatekeeper 拒绝运行 | 构建阶段递归签名，并在干净 Mac 验证 |
-| Electron 页面被导航到恶意地址 | 本地能力可能受到攻击 | 导航白名单、禁用 Node Integration、最小 IPC |
-| Mac App Store 沙箱限制 | 无法自由操作工程和执行 Shell | 使用 Developer ID + Notarized DMG 分发 |
-| OAuth 登录在 WebView 中行为异常 | 部分模型 Provider 无法登录 | 拦截外部登录并用系统浏览器处理，单独测试回调流程 |
+| Harness 仍处于预发布阶段 | CLI、配置或数据格式可能破坏兼容 | 锁定出厂版本、隔离安装、冒烟测试、Runtime 回滚和数据备份提示 |
+| npm 原生依赖平台漂移 | 应用能安装但 Harness 无法启动 | 原生 Runner 安装、平台元数据、模块检查和完整健康检查 |
+| Windows 子进程未全部结束 | 文件锁、更新失败或残留窗口 | 统一进程树终止、隐藏控制台并增加真实环境退出测试 |
+| 双平台构建资源互相污染 | 打包错误架构的 Node 或原生模块 | 平台缓存隔离、构建目标断言和 Runtime 元数据校验 |
+| 新版本迁移 `.dsh` 数据 | 单纯回滚 Runtime 可能不足 | 更新前备份提示，恢复数据必须由用户确认 |
+| macOS 嵌套签名不完整 | Gatekeeper 拒绝运行 | 递归签名、Notarization、Stapling 和干净 Mac 验证 |
+| Windows 未签名包被拦截 | SmartScreen 或杀毒软件阻止安装 | 内测收集误报，正式版接入可信签名和时间戳 |
+| Electron 页面导航到恶意地址 | 本地能力和用户数据受到攻击 | Origin 白名单、Sandbox、最小 IPC 和外部协议专项测试 |
 
-## 11. 待确认决策
+## 12. 已确认与待确认决策
 
-开始正式开发前需要确认：
+### 12.1 已确认
 
-- [ ] 产品名称是否最终使用 `DHDesk`。
-- [ ] 第一版是否只支持 Apple Silicon。
-- [ ] 最低系统版本是否确定为 macOS 14。
-- [ ] Harness 更新是仅手动检查，还是允许自动下载后提示重启。
-- [ ] 是否默认复用 `~/.dsh`，还是提供独立的 DHDesk Harness Home。
-- [ ] 是否需要 DHDesk 自身的自动更新服务。
-- [ ] 发布渠道使用 GitHub Releases、自有服务器还是对象存储。
-- [ ] 是否需要匿名崩溃报告；如需要，必须先定义脱敏策略。
+- [x] 产品名称使用 `DHDesk`。
+- [x] 同一仓库和同一业务代码支持 macOS 与 Windows。
+- [x] macOS 第一期为 arm64，目标最低版本 macOS 14。
+- [x] Windows 第一期为 x64，目标 Windows 10 22H2 / Windows 11。
+- [x] Windows 使用目标平台原生构建，不从 macOS 交叉制作 Runtime。
+- [x] Windows 安装产物使用 NSIS Setup EXE。
+- [x] 两个平台复用 Harness 官方 `.dsh` 用户目录。
+- [x] Harness 更新为用户手动确认，不静默安装或切换。
+- [x] Harness 更新与 DHDesk 自身更新保持分离。
+- [x] GitHub Actions Artifact 用于当前双平台内部测试包分发。
 
-## 12. 参考资料
+### 12.2 待确认
+
+- [ ] Windows 正式签名使用 OV/EV 证书还是 Azure Trusted Signing。
+- [ ] Windows NSIS 使用 one-click 还是 assisted 安装模式。
+- [ ] GitHub Releases 是否作为正式分发和 DHDesk 自更新渠道。
+- [ ] DHDesk 自身自动更新进入哪个版本。
+- [ ] 是否需要匿名崩溃报告；如需要，先定义脱敏和用户授权策略。
+- [ ] portable、Windows arm64、Intel Mac 和 Linux 的后续优先级。
+
+## 13. 参考资料
 
 - [DeepSeek Harness 项目](https://github.com/deepseek-ai/deepseek-harness)
 - [DeepSeek Harness 中文 README](https://github.com/deepseek-ai/deepseek-harness/blob/master/README.zh.md)
-- [CLI 行为说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/reference/README.md)
-- [Web UI 使用指南](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/index.md)
-- [Harness 架构说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/architecture.md)
-- [DSH Home 路径说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/util/home-paths/README.md)
-- [目录选择器说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/directory-picker-auto/README.md)
 - [npm: `@deepseek-ai/dsh`](https://www.npmjs.com/package/@deepseek-ai/dsh)
+- [Node.js 官方下载](https://nodejs.org/en/download)
+- [electron-builder 多平台构建](https://www.electron.build/multi-platform-build.html)
+- [electron-builder NSIS 配置](https://www.electron.build/nsis.html)
+- [electron-builder Windows 签名](https://www.electron.build/code-signing-win.html)
+- [GitHub Hosted Runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+- [Windows 支持实施计划](./windows-support-plan.md)

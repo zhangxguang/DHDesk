@@ -1,10 +1,12 @@
 import { app, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
+import { autoUpdater } from "electron-updater";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { RuntimeSnapshot } from "../shared/contracts";
 import { IPC_CHANNELS } from "../shared/contracts";
 import { confirmActiveRuntime, rollbackActiveRuntime } from "./active-runtime";
+import { DesktopUpdater } from "./desktop-updater";
 import { HarnessUpdater } from "./harness-updater";
 import { RuntimeLogger } from "./logging";
 import { ensureRuntimePlatformMetadata } from "./runtime-metadata";
@@ -31,6 +33,7 @@ if (!hasSingleInstanceLock) {
 let windowManager: WindowManager;
 let supervisor: HarnessProcessSupervisor | undefined;
 let updater: HarnessUpdater | undefined;
+let desktopUpdater: DesktopUpdater;
 let logger: RuntimeLogger;
 let isQuitting = false;
 let currentState: RuntimeSnapshot = { phase: "idle", message: "准备启动" };
@@ -40,6 +43,13 @@ async function bootstrap(): Promise<void> {
 
   logger = new RuntimeLogger(join(app.getPath("logs"), "harness.log"));
   windowManager = new WindowManager();
+  desktopUpdater = new DesktopUpdater({
+    currentVersion: app.getVersion(),
+    isPackaged: app.isPackaged,
+    client: autoUpdater,
+    logger
+  });
+  desktopUpdater.on("state", (snapshot) => windowManager.publishDesktopUpdateState(snapshot));
   registerIpc();
   registerLifecycle();
   registerApplicationMenu();
@@ -169,7 +179,7 @@ function registerIpc(): void {
     await startHarness();
   });
   ipcMain.handle(IPC_CHANNELS.openLogs, async (event) => {
-    assertLocalPage(event.senderFrame?.url, ["startup.html", "updater.html"]);
+    assertLocalPage(event.senderFrame?.url, ["startup.html", "updater.html", "app-updater.html"]);
     await shell.openPath(app.getPath("logs"));
   });
   ipcMain.handle(IPC_CHANNELS.harnessUpdateState, (event) => {
@@ -193,6 +203,26 @@ function registerIpc(): void {
       manager.markActivationFailed(targetVersion, currentState.details ?? "目标版本未能启动。");
     }
     return manager.state;
+  });
+  ipcMain.handle(IPC_CHANNELS.desktopUpdateState, (event) => {
+    assertDesktopUpdaterPage(event.senderFrame?.url);
+    return desktopUpdater.state;
+  });
+  ipcMain.handle(IPC_CHANNELS.checkDesktopUpdate, async (event) => {
+    assertDesktopUpdaterPage(event.senderFrame?.url);
+    return desktopUpdater.checkForUpdates();
+  });
+  ipcMain.handle(IPC_CHANNELS.downloadDesktopUpdate, async (event) => {
+    assertDesktopUpdaterPage(event.senderFrame?.url);
+    return desktopUpdater.downloadUpdate();
+  });
+  ipcMain.handle(IPC_CHANNELS.installDesktopUpdate, async (event) => {
+    assertDesktopUpdaterPage(event.senderFrame?.url);
+    if (desktopUpdater.state.phase !== "downloaded") throw new Error("DHDesk 更新尚未下载完成。");
+    await shutdown();
+    isQuitting = true;
+    windowManager.prepareToQuit();
+    desktopUpdater.quitAndInstall();
   });
 }
 
@@ -222,6 +252,11 @@ function registerApplicationMenu(): void {
           label: app.name,
           submenu: [
             { role: "about" },
+            {
+              label: "检查 DHDesk 更新…",
+              accelerator: "CommandOrControl+Alt+U",
+              click: () => void windowManager.showDesktopUpdater()
+            },
             { type: "separator" },
             { role: "hide" },
             { role: "hideOthers" },
@@ -241,7 +276,17 @@ function registerApplicationMenu(): void {
         },
         harnessMenu,
         { role: "editMenu" },
-        { role: "windowMenu" }
+        { role: "windowMenu" },
+        {
+          label: "帮助",
+          submenu: [
+            {
+              label: "检查 DHDesk 更新…",
+              accelerator: "CommandOrControl+Alt+U",
+              click: () => void windowManager.showDesktopUpdater()
+            }
+          ]
+        }
       ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -274,6 +319,10 @@ function assertStartupPage(url: string | undefined): void {
 
 function assertUpdaterPage(url: string | undefined): void {
   assertLocalPage(url, ["updater.html"]);
+}
+
+function assertDesktopUpdaterPage(url: string | undefined): void {
+  assertLocalPage(url, ["app-updater.html"]);
 }
 
 function assertLocalPage(url: string | undefined, allowedPages: string[]): void {

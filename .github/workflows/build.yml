@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: macOS arm64 DMG
+          - name: macOS arm64 DMG + ZIP
             runner: macos-14
             platform: darwin
             arch: arm64
@@ -35,7 +35,10 @@ jobs:
             artifact-name: DHDesk-mac-arm64
             artifact-path: |
               release/*.dmg
-              release/*.dmg.sha256
+              release/*.zip
+              release/latest-mac.yml
+              release/*.blockmap
+              release/*.sha256
           - name: Windows x64 NSIS
             runner: windows-2022
             platform: win32
@@ -44,7 +47,9 @@ jobs:
             artifact-name: DHDesk-win-x64
             artifact-path: |
               release/*.exe
-              release/*.exe.sha256
+              release/latest.yml
+              release/*.blockmap
+              release/*.sha256
 
     steps:
       - name: Check out repository
@@ -180,7 +185,7 @@ jobs:
           # The exact SHA-1 and full subject were already validated in the temporary keychain.
           export CSC_NAME="${DHDESK_DEVELOPER_ID_NAME#Developer ID Application: }"
           export APPLE_API_KEY="${DHDESK_API_KEY_PATH}"
-          npm run package:dmg
+          npm run package:mac:release
 
           dmg_path="$(find release -maxdepth 1 -type f -name '*.dmg' -print -quit)"
           if [[ -z "${dmg_path}" ]]; then
@@ -206,6 +211,25 @@ jobs:
       - name: Package Windows artifact
         if: matrix.platform == 'win32'
         run: npm run package:nsis
+
+      - name: Verify macOS update metadata
+        if: matrix.platform == 'darwin' && env.DHDESK_RELEASE_SIGNING == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f release/latest-mac.yml
+          grep -Fq '.zip' release/latest-mac.yml
+
+      - name: Verify Windows update metadata
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path release/latest.yml -PathType Leaf)) {
+            throw "Windows update metadata was not generated."
+          }
+          if (-not (Select-String -Path release/latest.yml -Pattern '\.exe' -Quiet)) {
+            throw "Windows update metadata does not reference the NSIS installer."
+          }
 
       - name: Verify macOS application signature
         if: matrix.platform == 'darwin'
@@ -288,4 +312,56 @@ jobs:
           if [[ -n "${DHDESK_SIGNING_DIR:-}" && -d "${DHDESK_SIGNING_DIR}" ]]; then
             find "${DHDESK_SIGNING_DIR}" -type f -delete
             rmdir "${DHDESK_SIGNING_DIR}" || true
+          fi
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_tag="v$(node -p "require('./package.json').version")"
+          if [[ "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package version ${expected_tag}." >&2
+            exit 1
+          fi
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mapfile -d '' release_files < <(
+            find release-artifacts -type f \
+              \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.yml' -o -name '*.blockmap' -o -name '*.sha256' \) \
+              -print0
+          )
+          if [[ "${#release_files[@]}" -eq 0 ]]; then
+            echo "No release assets were downloaded." >&2
+            exit 1
+          fi
+
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${release_files[@]}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${release_files[@]}" \
+              --title "DHDesk ${GITHUB_REF_NAME#v}" \
+              --generate-notes
           fi

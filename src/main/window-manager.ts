@@ -1,13 +1,14 @@
 import { BrowserWindow, shell } from "electron";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
-import type { HarnessUpdateSnapshot, RuntimeSnapshot } from "../shared/contracts";
+import type { DesktopUpdateSnapshot, HarnessUpdateSnapshot, RuntimeSnapshot } from "../shared/contracts";
 import { IPC_CHANNELS } from "../shared/contracts";
 import { getWindowCloseBehavior } from "./window-behavior";
 
 export class WindowManager {
   private window?: BrowserWindow;
   private updaterWindow?: BrowserWindow;
+  private desktopUpdaterWindow?: BrowserWindow;
   private harnessOrigin?: string;
   private appQuitting = false;
   private snapshot: RuntimeSnapshot = { phase: "idle", message: "准备启动" };
@@ -115,6 +116,46 @@ export class WindowManager {
     await updaterWindow.loadFile(updaterPath);
   }
 
+  async showDesktopUpdater(): Promise<void> {
+    if (this.desktopUpdaterWindow && !this.desktopUpdaterWindow.isDestroyed()) {
+      this.desktopUpdaterWindow.show();
+      this.desktopUpdaterWindow.focus();
+      return;
+    }
+
+    const updaterPath = join(__dirname, "../renderer/app-updater.html");
+    const updaterUrl = pathToFileURL(updaterPath).href;
+    const updaterWindow = new BrowserWindow({
+      width: 680,
+      height: 690,
+      minWidth: 620,
+      minHeight: 620,
+      parent: this.window,
+      show: false,
+      backgroundColor: "#0b0d12",
+      webPreferences: {
+        preload: join(__dirname, "../preload/index.js"),
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        webviewTag: false
+      }
+    });
+    this.desktopUpdaterWindow = updaterWindow;
+    if (process.platform === "darwin") updaterWindow.setWindowButtonVisibility(true);
+    updaterWindow.setTitle("DHDesk 更新");
+    updaterWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    updaterWindow.webContents.on("will-navigate", (event, url) => {
+      if (url === updaterUrl) return;
+      event.preventDefault();
+    });
+    updaterWindow.once("ready-to-show", () => updaterWindow.show());
+    updaterWindow.on("closed", () => {
+      this.desktopUpdaterWindow = undefined;
+    });
+    await updaterWindow.loadFile(updaterPath);
+  }
+
   publishState(snapshot: RuntimeSnapshot): void {
     this.snapshot = snapshot;
     const window = this.window;
@@ -126,6 +167,12 @@ export class WindowManager {
     const window = this.updaterWindow;
     if (!window || window.isDestroyed()) return;
     window.webContents.send(IPC_CHANNELS.harnessUpdateState, snapshot);
+  }
+
+  publishDesktopUpdateState(snapshot: DesktopUpdateSnapshot): void {
+    const window = this.desktopUpdaterWindow;
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send(IPC_CHANNELS.desktopUpdateState, snapshot);
   }
 
   getState(): RuntimeSnapshot {

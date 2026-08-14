@@ -4,6 +4,11 @@ copyright: Copyright © 2026 zxg
 asar: true
 directories:
   output: release
+publish:
+  provider: github
+  owner: zhangxguang
+  repo: DHDesk
+  releaseType: release
 files:
   - dist/**/*
   - package.json

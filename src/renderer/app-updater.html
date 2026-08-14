@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+    <title>DHDesk 更新</title>
+    <link rel="stylesheet" href="./updater.css" />
+  </head>
+  <body>
+    <main class="update-shell">
+      <header>
+        <div class="symbol" aria-hidden="true"><span></span></div>
+        <div>
+          <p class="eyebrow">DHDESK DESKTOP RELEASE</p>
+          <h1>DHDesk 更新</h1>
+          <p class="lede">从官方 GitHub Release 安全下载并安装新版桌面应用。</p>
+        </div>
+      </header>
+
+      <section class="version-panel" aria-label="版本信息">
+        <div>
+          <span class="label">当前版本</span>
+          <strong id="current-version">—</strong>
+        </div>
+        <span class="version-arrow" aria-hidden="true">→</span>
+        <div>
+          <span class="label">Release 最新版本</span>
+          <strong id="latest-version">尚未检查</strong>
+        </div>
+      </section>
+
+      <section class="status-panel" aria-live="polite">
+        <div class="status-heading">
+          <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+          <span id="status-message">正在读取更新状态</span>
+          <span class="percent" id="progress-percent"></span>
+        </div>
+        <div class="progress-track" id="progress-track" hidden>
+          <span id="progress-bar"></span>
+        </div>
+        <p class="details" id="status-details">检查更新不会中断当前正在运行的 Harness。</p>
+      </section>
+
+      <div class="actions">
+        <button class="primary-action" id="action-button" type="button">检查更新</button>
+        <button class="secondary-action" id="check-button" type="button" hidden>重新检查</button>
+        <button class="text-action" id="logs-button" type="button">查看日志</button>
+      </div>
+
+      <aside class="safety-note">
+        <span class="shield" aria-hidden="true">✓</span>
+        <div>
+          <strong>独立更新</strong>
+          <p>DHDesk 更新与 Harness Runtime 更新互不影响。macOS Release 会经过 Developer ID 签名、公证和 Gatekeeper 验证。</p>
+        </div>
+      </aside>
+
+      <footer>
+        <span>更新通道：GitHub Release</span>
+        <span>Harness 与 ~/.dsh 数据不会被删除</span>
+      </footer>
+    </main>
+    <script type="module" src="./app-updater.js"></script>
+  </body>
+</html>

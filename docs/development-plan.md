@@ -8,7 +8,7 @@
 >
 > 最后同步：2026-08-14
 >
-> 状态依据：当前仓库源码、30 项自动化测试及 GitHub Actions 双平台成功构建
+> 状态依据：当前仓库源码、34 项自动化测试及 GitHub Actions 双平台成功构建
 
 ## 1. 项目概述
 
@@ -32,7 +32,7 @@ DHDesk 同时提供独立的 Harness 版本管理能力，包括检查、下载�
 
 | 平台 | 最低目标版本 | 架构 | 安装产物 | CI 构建 | 正式签名 |
 |---|---|---|---|---|---|
-| macOS | macOS 14 | arm64 | DMG | 已完成 | 未完成 Developer ID 公证流程 |
+| macOS | macOS 14 | arm64 | DMG + 更新 ZIP | 已完成 | Developer ID 签名、公证、Stapling 和 Gatekeeper 验证已完成 |
 | Windows | Windows 10 22H2 / Windows 11 | x64 | NSIS Setup EXE | 已完成 | 未完成 Authenticode 签名 |
 
 ### 1.3 非目标
@@ -59,8 +59,8 @@ DHDesk 同时提供独立的 Harness 版本管理能力，包括检查、下载�
 | Harness Runtime | 应用内置 Node.js 启动独立子进程 | 已实现 |
 | 出厂 Runtime | `@deepseek-ai/dsh@0.1.0-rc.6` | 已实现 |
 | Harness 更新 | npm Registry + 版本化 Runtime 目录 | 核心链路已实现 |
-| DHDesk 自更新 | 待选型，优先评估 `electron-updater` | 未实现 |
-| macOS 打包 | electron-builder DMG arm64 | 已实现 ad-hoc 签名 CI 内测包，正式 Developer ID 签名未完成 |
+| DHDesk 自更新 | `electron-updater` + 公开 GitHub Release | 已实现手动检查、下载和重启安装 |
+| macOS 打包 | electron-builder DMG + ZIP arm64 | Developer ID 签名、公证、Stapling 和 Gatekeeper 验证已完成 |
 | Windows 打包 | electron-builder NSIS x64 | 已实现未签名 CI 包 |
 | CI | GitHub Actions 原生双平台矩阵 | 已实现 |
 
@@ -85,6 +85,10 @@ flowchart LR
     G --> H["npm Registry"]
     H --> I["版本化 Runtime 目录"]
     I --> B
+
+    A --> K["DHDesk Update Manager"]
+    K --> L["公开 GitHub Release"]
+    L --> M["签名安装包与更新元数据"]
 
     D --> J["用户 .dsh 数据目录"]
 ```
@@ -286,6 +290,19 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [ ] 提供手动选择和删除已安装 Harness 版本的高级界面。
 - [ ] 增加断网、损坏包、安装超时和回滚失败的故障注入测试。
 
+### 5.4 DHDesk 桌面应用自更新
+
+- [x] DHDesk 自更新与 Harness Runtime 更新使用独立菜单、窗口、IPC 和状态模型。
+- [x] 使用 `electron-updater` 读取公开 GitHub Release 更新元数据。
+- [x] 默认仅手动检查和下载，不在后台静默安装。
+- [x] 展示当前版本、Release 版本、下载进度和失败详情。
+- [x] 下载完成后由用户确认，先安全停止 Harness 再重启安装。
+- [x] 开发模式禁用自更新，避免读取正式发布通道。
+- [x] macOS Release 同时生成更新 ZIP、Blockmap 和 `latest-mac.yml`。
+- [x] Windows Release 生成 NSIS EXE、Blockmap 和 `latest.yml`。
+- [x] 更新元数据和安装包由 electron-builder 提供 SHA-512 完整性校验。
+- [ ] 在已安装的 macOS 0.1.1 和 Windows 0.1.1 上完成跨版本升级验收。
+
 ## 6. 双平台 Runtime、打包与 CI
 
 ### 6.1 Runtime 平台化
@@ -310,8 +327,9 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] 打包时排除类型声明、Source Map、README/CHANGELOG、测试和示例文件，减少安装落盘文件数量。
 - [x] 配置蓝鲸飞船应用图标的 ICNS、ICO 和 PNG 资源。
 - [x] 生成 `DHDesk-<version>-mac-arm64.dmg`。
+- [x] 生成 macOS 自更新 ZIP、Blockmap 和 `latest-mac.yml`。
 - [x] 生成 `DHDesk-<version>-win-x64-setup.exe`。
-- [x] 为 DMG 和 EXE 生成 SHA-256 校验文件。
+- [x] 为 DMG、ZIP 和 EXE 生成 SHA-256 校验文件。
 - [x] 打包命令显式使用 `--publish never`，构建 Artifact 时不隐式创建 GitHub Release。
 - [x] Windows NSIS 使用 ZIP 归档，优先缩短大量小文件的安装解压时间。
 
@@ -334,10 +352,10 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] 两个平台成功构建安装包和 SHA-256 文件。
 - [x] 上传 `DHDesk-mac-arm64` 和 `DHDesk-win-x64` Artifacts。
 - [x] CI 构建显式禁用隐式发布和证书自动发现。
-- [ ] Windows CI 静默安装 NSIS 包，并验证应用、内置 Node 和 Harness 入口完整（步骤已加入，待首次成功运行确认）。
+- [x] Windows CI 静默安装 NSIS 包，并验证应用、内置 Node 和 Harness 入口完整。
 - [ ] 更新 GitHub Actions 依赖，消除旧 Node.js Action Runtime 警告。
-- [ ] 增加 macOS 安装包内容、应用启动和双平台签名状态自动验证。
-- [ ] Tag 构建正式签名产物，并在双平台验证通过后创建 GitHub Release。
+- [x] 自动验证 macOS App/DMG 签名、Stapling 和 Gatekeeper 状态。
+- [x] 配置 Tag 构建正式 macOS 签名产物，并在双平台验证通过后创建 GitHub Release。
 
 ## 7. 安全与正式发布
 
@@ -356,12 +374,12 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 
 - [x] 配置 Hardened Runtime 和 entitlements。
 - [x] 生成内部测试 DMG 和 SHA-256 文件。
-- [ ] 使用 Developer ID Application 证书递归签名 App、Node sidecar 和嵌套原生二进制。
-- [ ] 完成 Apple Notarization 和 Stapling。
-- [ ] 通过 `codesign --verify --deep --strict`、`spctl` 和 Gatekeeper 验证。
+- [x] 使用指定团队的 Developer ID Application 证书签名 App、Node sidecar 和嵌套原生二进制。
+- [x] 完成 Apple Notarization 和 Stapling。
+- [x] 通过 `codesign --verify --deep --strict`、`spctl` 和 Gatekeeper 验证。
 - [ ] 在无开发环境的干净 Mac 上验证安装、运行和 Harness 更新。
 
-现有本机构建曾使用 Apple Development 证书签名，但这不等同于 Developer ID 正式分发签名。GitHub Actions 分支构建使用 ad-hoc 签名封装完整 App，并执行 `codesign --verify --deep --strict` 校验；它只用于内测，不能替代 Developer ID 签名和 Apple 公证。
+GitHub Actions 使用 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`。流水线会按证书 SHA-1、完整名称和 Team ID 三重校验临时钥匙串，只允许这一张身份参与构建，并在 Job 结束时删除证书和 App Store Connect API Key 临时文件。
 
 ### 7.3 Windows 发布
 
@@ -389,23 +407,23 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 | 阶段 2 | Harness 检查、安装、切换和回滚 | 核心完成 | 备份提示、清理策略、故障注入测试 |
 | 阶段 3 | macOS/Windows Runtime 和安装包 | 已完成内测构建 | 双平台真实机器安装与功能验收 |
 | 阶段 4 | 双平台 CI Artifact | 已完成 | 包内容验证、Action 版本升级 |
-| 阶段 5 | 正式签名、公证和 Release | 未完成 | Developer ID、公证、Windows 签名、Release |
-| 阶段 6 | DHDesk 自更新和增强 | 未开始 | 自更新、版本管理页、菜单栏模式 |
+| 阶段 5 | 正式签名、公证和 Release | 部分完成 | macOS 已完成；执行首个 Tag Release，Windows 签名仍待完成 |
+| 阶段 6 | DHDesk 自更新和增强 | 自更新核心完成 | 跨版本安装验收、版本管理页、菜单栏模式 |
 
 ### 8.1 下一阶段优先级
 
 1. 在干净 Windows 10/11 和 macOS 14+ 机器完成安装、启动、退出和 Harness 更新验收。
-2. 完成窗口状态恢复、诊断信息复制、下载处理和完整日志脱敏。
-3. 增加 Harness 更新失败、损坏包、断网和进程残留测试。
-4. 建立 macOS Developer ID 签名、公证以及 Windows Authenticode 签名流水线。
-5. 将验证通过的 DMG、EXE 和校验文件发布到 GitHub Releases。
-6. 再开始 DHDesk 自身自动更新和已安装 Harness 版本管理页。
+2. 用下一版本验证 DHDesk 在 macOS/Windows 上从 0.1.1 跨版本自更新。
+3. 确认并接入 Windows Authenticode 或 Azure Trusted Signing。
+4. 完成窗口状态恢复、诊断信息复制、下载处理和完整日志脱敏。
+5. 增加 Harness 更新失败、损坏包、断网和进程残留测试。
+6. 开发已安装 Harness 版本管理页和清理策略。
 
 ## 9. 测试计划与当前覆盖
 
 ### 9.1 已有自动化测试
 
-当前共有 6 个测试文件、25 项测试，覆盖：
+当前共有 8 个测试文件、34 项测试，覆盖：
 
 - [x] 激活 Runtime 原子写入、确认和回滚。
 - [x] Harness 更新状态、版本检查、安装和错误处理。
@@ -414,6 +432,7 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] macOS/Windows Runtime 路径解析和回退。
 - [x] Runtime 平台元数据读写和不匹配拒绝。
 - [x] Windows `taskkill` 参数与平台化进程树逻辑。
+- [x] DHDesk 自更新的开发模式禁用、版本检查、下载进度、失败和重启安装状态。
 
 ### 9.2 待补自动化测试
 
@@ -469,8 +488,8 @@ Windows：
 ### 10.2 macOS 标准
 
 - [x] CI 可生成 arm64 DMG 和 SHA-256 文件。
-- [ ] App 及所有嵌套可执行文件使用 Developer ID Application 签名。
-- [ ] 发布 DMG 完成公证和 Stapling，并通过 Gatekeeper。
+- [x] App 及所有嵌套可执行文件使用 Developer ID Application 签名。
+- [x] 发布 DMG 完成公证和 Stapling，并通过 Gatekeeper。
 - [ ] 在干净 Mac 上完成安装、启动和 Harness 更新验收。
 
 ### 10.3 Windows 标准
@@ -507,13 +526,13 @@ Windows：
 - [x] Harness 更新为用户手动确认，不静默安装或切换。
 - [x] Harness 更新与 DHDesk 自身更新保持分离。
 - [x] GitHub Actions Artifact 用于当前双平台内部测试包分发。
+- [x] 仓库改为 Public，GitHub Releases 作为正式分发和 DHDesk 自更新渠道。
+- [x] DHDesk 自更新核心功能进入 `0.1.1`。
 
 ### 12.2 待确认
 
 - [ ] Windows 正式签名使用 OV/EV 证书还是 Azure Trusted Signing。
 - [ ] Windows NSIS 使用 one-click 还是 assisted 安装模式。
-- [ ] GitHub Releases 是否作为正式分发和 DHDesk 自更新渠道。
-- [ ] DHDesk 自身自动更新进入哪个版本。
 - [ ] 是否需要匿名崩溃报告；如需要，先定义脱敏和用户授权策略。
 - [ ] portable、Windows arm64、Intel Mac 和 Linux 的后续优先级。
 

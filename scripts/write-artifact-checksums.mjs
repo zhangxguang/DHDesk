@@ -6,10 +6,10 @@ import { basename, join, resolve } from "node:path";
 const releaseDirectory = resolve(import.meta.dirname, "..", "release");
 const entries = await readdir(releaseDirectory, { withFileTypes: true });
 const artifacts = entries
-  .filter((entry) => entry.isFile() && /\.(?:dmg|exe)$/i.test(entry.name))
+  .filter((entry) => entry.isFile() && /\.(?:dmg|exe|zip)$/i.test(entry.name))
   .map((entry) => join(releaseDirectory, entry.name));
 
-if (artifacts.length === 0) throw new Error(`No DMG or EXE artifacts were found in ${releaseDirectory}.`);
+if (artifacts.length === 0) throw new Error(`No DMG, ZIP, or EXE artifacts were found in ${releaseDirectory}.`);
 
 for (const artifact of artifacts) {
   const hash = createHash("sha256");

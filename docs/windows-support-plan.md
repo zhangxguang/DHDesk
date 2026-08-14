@@ -1,7 +1,7 @@
 # DHDesk 双平台支持开发计划
 
 > 目标平台：macOS arm64 + Windows x64
-> 文档状态：实施前方案
+> 文档状态：实施中（双平台构建已完成，Windows 正式签名与真机验收待完成）
 > 最后更新：2026-08-14
 > 对应分支：`feature/windows-support`
 
@@ -40,7 +40,7 @@ DHDesk 继续使用 Electron + TypeScript + electron-builder，不更换桌面�
 - Intel Mac。
 - Microsoft Store 或 Mac App Store。
 - Windows portable 单文件版本。
-- DHDesk 自身的自动更新。
+- DHDesk 自身自动更新原不属于本计划范围，现已作为后续功能独立实现。
 - 自动迁移或恢复 `~/.dsh` 用户数据。
 - Harness 历史版本管理页面。
 
@@ -315,14 +315,15 @@ DHDesk-<version>-win-x64-setup.exe
 
 ### 6.1 macOS
 
-当前仓库没有固定 macOS 签名身份，也尚未建立可复现的正式签名与公证流水线。现有内部 DMG 曾通过构建机本地证书配置，使用 Apple Development 证书签名；这是本地构建记录，不是仓库配置或 CI 能够保证的发布状态。正式分发目标为：
+macOS 正式签名与公证流水线已经建立。GitHub Actions 仅接受 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`，并按证书 SHA-1、完整名称和 Team ID 校验临时钥匙串，避免误用本机或其他团队身份。
 
-- [ ] Developer ID Application 证书。
-- [ ] Hardened Runtime。
-- [ ] Node sidecar、Electron Framework 和所有嵌套原生模块签名。
-- [ ] Apple Notarization。
-- [ ] Stapling。
-- [ ] `codesign --verify --deep --strict` 和 Gatekeeper 验证。
+- [x] Developer ID Application 证书。
+- [x] Hardened Runtime。
+- [x] Node sidecar、Electron Framework 和所有嵌套原生模块签名。
+- [x] Apple Notarization。
+- [x] Stapling。
+- [x] `codesign --verify --deep --strict` 和 Gatekeeper 验证。
+- [ ] 无开发环境干净 Mac 真机验收。
 
 ### 6.2 Windows
 
@@ -365,14 +366,14 @@ windows-2022:
 
 要求：
 
-- [ ] 每个 job 开始时输出并断言构建平台与架构。
-- [ ] Runtime 缓存 key 必须包含 OS、架构、Node 版本和 Harness 版本。
-- [ ] 禁止在 macOS 与 Windows job 之间共享 `resources/node` 或 `bundled-runtime` 缓存。
-- [ ] Pull Request 构建未签名目录包或安装包。
-- [ ] Tag 构建正式签名产物。
-- [ ] 两个平台测试全部通过后才创建 Release。
-- [ ] Release 同时附带 SHA-256 校验文件。
-- [ ] CI 日志不得输出证书密码、Token 或签名服务凭据。
+- [x] 每个 job 开始时输出并断言构建平台与架构。
+- [x] Runtime 缓存 key 包含 OS、架构和 Runtime Manifest 内容摘要。
+- [x] 禁止在 macOS 与 Windows job 之间共享 `resources/node` 或 `bundled-runtime` 缓存。
+- [x] Pull Request 构建未签名安装包。
+- [x] Tag 构建正式签名、公证的 macOS 产物和未签名 Windows 产物。
+- [x] 两个平台测试全部通过后才创建 Release。
+- [x] Release 同时附带 SHA-256 校验文件和自更新元数据。
+- [x] CI 日志不输出证书密码、Token 或签名服务凭据。
 
 当前 GitHub Hosted Runner 中，`macos-14` 为 arm64，`windows-2022` 为 x64；工作流仍需显式断言架构，避免未来 Runner 标签变化造成 Runtime 与应用架构不一致。
 

@@ -3,7 +3,7 @@
 > 来源：`docs/windows-support-plan.md`  
 > 目标平台：macOS arm64 + Windows x64  
 > 对应分支：`feature/windows-support`  
-> 文档状态：待实施  
+> 文档状态：实施中
 > 最后更新：2026-08-14
 
 ## 1. 拆分目标
@@ -31,8 +31,8 @@
 | E4 进程生命周期 | 已实现 | `windowsHide`、统一进程树终止、taskkill 参数及原生进程终止测试 | Windows 下无闪窗、无 `conhost.exe` 残留验收 |
 | E5 UI 适配 | 已实现平台分支 | macOS/Windows 菜单分支、macOS 窗口按钮 API 隔离 | Windows 高 DPI 和按钮命中手工验收 |
 | E6 打包与 NSIS | macOS 已验证 | builder 配置拆分、`extends` 合并、平台资源过滤、多尺寸 ICO、DMG 构建 | Windows NSIS 原生构建；DEC-001 最终确认 |
-| E7 测试与 CI | 已配置待运行 | 25 个本地测试、双平台 GitHub Actions、SHA-256 产物文件 | 推送后观察 macOS/Windows 两个 Job |
-| E8 签名发布 | 未开始 | 无 | Developer ID 公证、Windows 签名方案和分发渠道 |
+| E7 测试与 CI | 已运行 | 34 个本地测试、双平台 GitHub Actions、安装冒烟测试、SHA-256 产物文件 | 双平台真机回归 |
+| E8 签名发布 | 部分完成 | macOS Developer ID 签名、公证、Stapling、Gatekeeper 验证；Tag Release 流程 | Windows 签名方案和双平台真机验收 |
 
 “已实现”表示代码与本地自动化检查完成，不等于 Windows 原生验收完成。Windows 相关需求只有在目标 Runner 或干净 Windows 机器通过后才能勾选最终验收项。
 
@@ -51,7 +51,7 @@
 
 - Windows arm64、Intel Mac。
 - Microsoft Store、Mac App Store、Windows portable 版本。
-- DHDesk 自身自动更新。
+- DHDesk 自身自动更新原不属于本期，现已作为独立后续功能实现。
 - Harness 历史版本管理页面。
 - 自动备份、迁移或恢复 `.dsh` 用户数据。
 
@@ -452,13 +452,13 @@ flowchart LR
 - 优先级：P2
 - 依赖：WIN-CI-001
 - 开发任务：
-  - [ ] 使用 Developer ID Application 证书。
-  - [ ] 启用 Hardened Runtime 和 entitlements。
-  - [ ] 签名 Node sidecar、Electron Framework 和嵌套原生模块。
-  - [ ] 完成 Notarization 和 Stapling。
-  - [ ] CI 安全注入证书和公证凭据。
+  - [x] 使用指定团队的 Developer ID Application 证书。
+  - [x] 启用 Hardened Runtime 和 entitlements。
+  - [x] 签名 Node sidecar、Electron Framework 和嵌套原生模块。
+  - [x] 完成 Notarization 和 Stapling。
+  - [x] CI 安全注入证书和公证凭据。
 - 验收标准：
-  - [ ] `codesign --verify --deep --strict` 通过。
+  - [x] `codesign --verify --deep --strict` 通过。
   - [ ] Gatekeeper 验证和干净机器安装通过。
 
 #### WIN-REL-002：Windows 代码签名
@@ -502,12 +502,11 @@ flowchart LR
 
 ### DEC-003：正式分发渠道
 
-- 候选：GitHub Releases 或自有下载渠道。
-- 最晚确认时间：开始 WIN-REL-003 前。
+- 已确认：公开 GitHub Releases，同时作为安装包分发和 DHDesk 自更新渠道。
 
 ### DEC-004：DHDesk 自更新排期
 
-- 当前结论：不属于本期双平台支持。
+- 当前结论：保持为独立功能，但已在 `0.1.1` 实现核心链路。
 - 要求：Harness Runtime 更新与 DHDesk 应用更新继续保持独立。
 
 ## 6. 推荐实施批次

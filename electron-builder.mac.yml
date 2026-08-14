@@ -38,6 +38,9 @@ mac:
     - target: dmg
       arch:
         - arm64
+    - target: zip
+      arch:
+        - arm64
 dmg:
   title: "DHDesk ${version}"
   artifactName: "DHDesk-${version}-mac-${arch}.${ext}"

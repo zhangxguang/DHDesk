@@ -9,5 +9,6 @@ await Promise.all([
   copyFile(resolve(source, "startup.html"), resolve(target, "startup.html")),
   copyFile(resolve(source, "startup.css"), resolve(target, "startup.css")),
   copyFile(resolve(source, "updater.html"), resolve(target, "updater.html")),
-  copyFile(resolve(source, "updater.css"), resolve(target, "updater.css"))
+  copyFile(resolve(source, "updater.css"), resolve(target, "updater.css")),
+  copyFile(resolve(source, "app-updater.html"), resolve(target, "app-updater.html"))
 ]);

@@ -1,0 +1,308 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  background: #0b0d12;
+  color: #f3f6fb;
+  --accent: #4d7cff;
+  --accent-bright: #78a0ff;
+  --muted: #8c94a5;
+  --hairline: rgba(255, 255, 255, 0.09);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-width: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background:
+    radial-gradient(circle at 62% 38%, rgba(77, 124, 255, 0.12), transparent 34%),
+    linear-gradient(145deg, #0b0d12 0%, #0e1118 52%, #090b10 100%);
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  opacity: 0.28;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+}
+
+button {
+  font: inherit;
+}
+
+.shell {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  grid-template-rows: 66px 1fr 64px;
+}
+
+.titlebar,
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 30px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.titlebar {
+  padding-left: 92px;
+  border-bottom: 1px solid var(--hairline);
+  -webkit-app-region: drag;
+}
+
+.local-label {
+  color: rgba(120, 160, 255, 0.86);
+}
+
+.stage {
+  width: min(720px, calc(100vw - 96px));
+  margin: auto;
+  padding: 42px 0 54px;
+}
+
+.brand-lockup {
+  animation: arrive 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.mark {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 30px;
+  border: 1px solid rgba(120, 160, 255, 0.42);
+  border-radius: 17px;
+  transform: rotate(45deg);
+  box-shadow: 0 0 46px rgba(77, 124, 255, 0.18);
+}
+
+.mark::before,
+.mark::after {
+  position: absolute;
+  content: "";
+  background: var(--accent-bright);
+}
+
+.mark::before {
+  top: 25px;
+  left: 10px;
+  width: 32px;
+  height: 2px;
+}
+
+.mark::after {
+  top: 10px;
+  left: 25px;
+  width: 2px;
+  height: 32px;
+}
+
+.mark-core {
+  position: absolute;
+  inset: 20px;
+  border-radius: 3px;
+  background: #d9e4ff;
+  box-shadow: 0 0 18px rgba(120, 160, 255, 0.8);
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--accent-bright);
+  font-size: 11px;
+  font-weight: 720;
+  letter-spacing: 0.18em;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(58px, 8vw, 92px);
+  font-weight: 620;
+  letter-spacing: -0.065em;
+  line-height: 0.95;
+}
+
+.runtime-status {
+  margin-top: 76px;
+  animation: arrive 560ms 100ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.status-line {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 560;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  box-shadow: 0 0 0 0 rgba(77, 124, 255, 0.5);
+  animation: status-pulse 1.8s ease-out infinite;
+}
+
+.status-dot.failed {
+  background: #ff758c;
+  box-shadow: none;
+  animation: none;
+}
+
+.progress {
+  position: relative;
+  height: 1px;
+  margin-top: 18px;
+  overflow: hidden;
+  background: var(--hairline);
+}
+
+.progress span {
+  position: absolute;
+  inset-block: 0;
+  width: 32%;
+  background: linear-gradient(90deg, transparent, var(--accent-bright), transparent);
+  animation: travel 1.45s ease-in-out infinite;
+}
+
+.progress.failed span {
+  display: none;
+}
+
+.detail {
+  min-height: 20px;
+  margin: 14px 0 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.recovery {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 28px;
+  margin-left: 20px;
+  animation: reveal 220ms ease-out both;
+}
+
+.recovery[hidden] {
+  display: none;
+}
+
+.primary-action {
+  min-width: 108px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+  transition: background-color 160ms ease, transform 160ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.primary-action:hover {
+  background: #5d88ff;
+  transform: translateY(-1px);
+}
+
+.primary-action:active {
+  transform: translateY(0);
+}
+
+.text-action {
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: #aeb8ce;
+  cursor: pointer;
+  font-size: 13px;
+  transition: color 160ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.text-action:hover {
+  color: white;
+}
+
+footer {
+  border-top: 1px solid var(--hairline);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes status-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(77, 124, 255, 0.48);
+  }
+  55%,
+  100% {
+    box-shadow: 0 0 0 9px rgba(77, 124, 255, 0);
+  }
+}
+
+@keyframes travel {
+  from {
+    left: -34%;
+  }
+  to {
+    left: 102%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

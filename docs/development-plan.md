@@ -325,16 +325,16 @@ flowchart TD
 
 目标：验证最关键的打包和运行链路。
 
-- [ ] 初始化 Electron + TypeScript 工程。
-- [ ] 下载并内置兼容版本的 Node.js。
-- [ ] 构建一个固定版本的 Harness Runtime。
-- [ ] 从 Electron 主进程启动 `dsh web`。
-- [ ] 解析动态端口并在 BrowserWindow 中加载 Web UI。
-- [ ] 验证模型设置页面可用。
-- [ ] 验证 macOS 原生工作区选择器可打开。
-- [ ] 验证 Agent 可以读取文件、修改文件和运行 Shell。
-- [ ] 验证退出应用后 Harness 进程正常结束。
-- [ ] 对未公证包进行本机打包测试。
+- [x] 初始化 Electron + TypeScript 工程。
+- [x] 下载并内置兼容版本的 Node.js。
+- [x] 构建一个固定版本的 Harness Runtime。
+- [x] 从 Electron 主进程启动 `dsh web`。
+- [x] 解析动态端口并在 BrowserWindow 中加载 Web UI。
+- [x] 验证模型设置页面可用。
+- [ ] 验证 macOS 原生工作区选择器可打开（控件已确认，原生对话框仍需人工验收）。
+- [ ] 验证 Agent 可以读取文件、修改文件和运行 Shell（需要用户配置有效模型凭据）。
+- [x] 验证退出应用后 Harness 进程正常结束。
+- [x] 对未公证包进行本机打包测试。
 
 交付物：可双击运行的内部测试 `.app`。
 
@@ -500,4 +500,3 @@ flowchart TD
 - [DSH Home 路径说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/util/home-paths/README.md)
 - [目录选择器说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/directory-picker-auto/README.md)
 - [npm: `@deepseek-ai/dsh`](https://www.npmjs.com/package/@deepseek-ai/dsh)
-

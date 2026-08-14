@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+    <title>DHDesk</title>
+    <link rel="stylesheet" href="./startup.css" />
+  </head>
+  <body>
+    <main class="shell" aria-live="polite">
+      <header class="titlebar">
+        <span>DHDesk</span>
+        <span class="local-label">LOCAL RUNTIME</span>
+      </header>
+
+      <section class="stage">
+        <div class="brand-lockup">
+          <div class="mark" aria-hidden="true">
+            <span class="mark-core"></span>
+          </div>
+          <p class="eyebrow">DEEPSEEK HARNESS FOR MAC</p>
+          <h1>DHDesk</h1>
+        </div>
+
+        <div class="runtime-status" id="runtime-status">
+          <div class="status-line">
+            <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+            <span id="status-message">正在准备本地运行环境</span>
+          </div>
+          <div class="progress" id="progress" aria-hidden="true">
+            <span></span>
+          </div>
+          <p class="detail" id="status-detail">第一次启动可能需要几秒钟。</p>
+        </div>
+
+        <div class="recovery" id="recovery" hidden>
+          <button type="button" class="primary-action" id="retry-button">重新启动</button>
+          <button type="button" class="text-action" id="logs-button">查看日志</button>
+        </div>
+      </section>
+
+      <footer>
+        <span>服务仅在这台 Mac 上运行</span>
+        <span id="runtime-version">Harness</span>
+      </footer>
+    </main>
+
+    <script type="module" src="./startup.js"></script>
+  </body>
+</html>

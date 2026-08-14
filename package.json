@@ -1,0 +1,36 @@
+{
+  "name": "dhdesk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A macOS desktop launcher and runtime manager for DeepSeek Harness.",
+  "author": "zxg",
+  "license": "MIT",
+  "main": "dist/main/app.js",
+  "scripts": {
+    "build": "npm run clean && npm run build:main && npm run build:renderer && npm run copy:static",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "tsc -p tsconfig.renderer.json",
+    "clean": "node scripts/clean.mjs",
+    "copy:static": "node scripts/copy-static.mjs",
+    "dev": "npm run build && electron .",
+    "start": "electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "runtime:prepare": "npm run runtime:prepare:node && npm run runtime:prepare:harness",
+    "runtime:prepare:node": "node scripts/prepare-node-runtime.mjs",
+    "runtime:prepare:harness": "node scripts/prepare-harness-runtime.mjs",
+    "package:dir": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir --mac",
+    "package:dmg": "npm run build && electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

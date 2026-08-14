@@ -1,0 +1,12 @@
+node_modules/
+dist/
+release/
+coverage/
+.DS_Store
+*.log
+
+# Generated, platform-specific runtimes. Recreate with npm run runtime:prepare.
+resources/node/*
+!resources/node/.gitkeep
+resources/bundled-runtime/*
+!resources/bundled-runtime/.gitkeep

@@ -76,6 +76,8 @@ jobs:
         run: npm test
 
       - name: Package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run ${{ matrix.package-script }}
 
       - name: Write SHA-256 checksums

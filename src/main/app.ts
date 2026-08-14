@@ -1,11 +1,19 @@
-import { app, ipcMain, shell } from "electron";
+import { app, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { RuntimeSnapshot } from "../shared/contracts";
 import { IPC_CHANNELS } from "../shared/contracts";
+import { confirmActiveRuntime, rollbackActiveRuntime } from "./active-runtime";
+import { HarnessUpdater } from "./harness-updater";
 import { RuntimeLogger } from "./logging";
 import { HarnessProcessSupervisor } from "./process-supervisor";
-import { locateHarnessRuntime, locateNodeRuntime } from "./runtime-locator";
+import {
+  locateHarnessRuntime,
+  locateNodeRuntime,
+  locateNpmCli,
+  type RuntimeInstallation
+} from "./runtime-locator";
 import { WindowManager } from "./window-manager";
 
 app.setName("DHDesk");
@@ -19,6 +27,7 @@ if (!hasSingleInstanceLock) {
 
 let windowManager: WindowManager;
 let supervisor: HarnessProcessSupervisor | undefined;
+let updater: HarnessUpdater | undefined;
 let logger: RuntimeLogger;
 let isQuitting = false;
 let currentState: RuntimeSnapshot = { phase: "idle", message: "准备启动" };
@@ -30,19 +39,21 @@ async function bootstrap(): Promise<void> {
   windowManager = new WindowManager();
   registerIpc();
   registerLifecycle();
+  registerApplicationMenu();
   await startHarness();
 }
 
-async function startHarness(): Promise<void> {
+async function startHarness(options: { allowPendingRollback?: boolean } = {}): Promise<RuntimeInstallation | undefined> {
   if (supervisor) await supervisor.stop();
 
   setState({ phase: "locating", message: "正在检查本地 Runtime" });
   await windowManager.showStartup();
+  let runtime: RuntimeInstallation | undefined;
 
   try {
     const appRoot = app.getAppPath();
     const resourcesPath = process.resourcesPath;
-    const runtime = await locateHarnessRuntime({
+    runtime = await locateHarnessRuntime({
       appRoot,
       resourcesPath,
       userDataPath: app.getPath("userData"),
@@ -55,6 +66,7 @@ async function startHarness(): Promise<void> {
       electronExecutable: process.execPath,
       isElectron: Boolean(process.versions.electron)
     });
+    await ensureUpdater(runtime, node.executablePath, appRoot, resourcesPath);
 
     await logger.info(`Resolved Harness ${runtime.version} from ${runtime.source}: ${runtime.entryPath}`);
     supervisor = new HarnessProcessSupervisor({
@@ -66,22 +78,61 @@ async function startHarness(): Promise<void> {
       dshHome: process.env.DHDESK_DSH_HOME,
       logger
     });
+    let startupComplete = false;
     supervisor.on("state", (snapshot: RuntimeSnapshot) => {
       setState(snapshot);
-      if (snapshot.phase === "failed") void windowManager.showStartup();
+      if (snapshot.phase === "failed" && startupComplete) void windowManager.showStartup();
     });
 
     const running = await supervisor.start();
+    startupComplete = true;
     const startupHoldMs = Number(process.env.DHDESK_STARTUP_HOLD_MS ?? "0");
     if (!app.isPackaged && Number.isFinite(startupHoldMs) && startupHoldMs > 0) {
       await new Promise((resolvePromise) => setTimeout(resolvePromise, Math.min(startupHoldMs, 30_000)));
     }
     if (running.url) await windowManager.loadHarness(running.url);
+    if (runtime.source === "managed" && runtime.pendingValidation) {
+      await confirmActiveRuntime(app.getPath("userData"), runtime.version);
+      runtime = { ...runtime, pendingValidation: false };
+      await logger.info(`Confirmed managed Harness runtime ${runtime.version}`);
+    }
+    updater?.setCurrentRuntime(runtime);
+    return runtime;
   } catch (error) {
     const details = error instanceof Error ? error.message : "发生未知启动错误。";
     await logger.error(error instanceof Error ? error.stack ?? error.message : String(error));
+    if (runtime?.source === "managed" && runtime.pendingValidation && options.allowPendingRollback !== false) {
+      const failedVersion = runtime.version;
+      const restoredVersion = await rollbackActiveRuntime(app.getPath("userData"));
+      await logger.error(
+        `Managed Harness ${failedVersion} failed validation; rolling back to ${restoredVersion ?? "bundled runtime"}`
+      );
+      const restored = await startHarness({ allowPendingRollback: false });
+      updater?.markActivationFailed(failedVersion, details);
+      return restored;
+    }
     setState({ phase: "failed", message: "DeepSeek Harness 启动失败", details });
+    return undefined;
   }
+}
+
+async function ensureUpdater(
+  runtime: RuntimeInstallation,
+  nodeExecutable: string,
+  appRoot: string,
+  resourcesPath: string
+): Promise<void> {
+  if (updater) return;
+  const npmCliPath = await locateNpmCli({ appRoot, resourcesPath });
+  updater = new HarnessUpdater({
+    userDataPath: app.getPath("userData"),
+    nodeExecutable,
+    npmCliPath,
+    currentRuntime: runtime,
+    logger,
+    registryUrl: process.env.DHDESK_NPM_REGISTRY
+  });
+  updater.on("state", (snapshot) => windowManager.publishUpdateState(snapshot));
 }
 
 function setState(snapshot: RuntimeSnapshot): void {
@@ -99,9 +150,70 @@ function registerIpc(): void {
     await startHarness();
   });
   ipcMain.handle(IPC_CHANNELS.openLogs, async (event) => {
-    assertStartupPage(event.senderFrame?.url);
+    assertLocalPage(event.senderFrame?.url, ["startup.html", "updater.html"]);
     await shell.openPath(app.getPath("logs"));
   });
+  ipcMain.handle(IPC_CHANNELS.harnessUpdateState, (event) => {
+    assertUpdaterPage(event.senderFrame?.url);
+    return requireUpdater().state;
+  });
+  ipcMain.handle(IPC_CHANNELS.checkHarnessUpdate, async (event) => {
+    assertUpdaterPage(event.senderFrame?.url);
+    return requireUpdater().checkForUpdates();
+  });
+  ipcMain.handle(IPC_CHANNELS.installHarnessUpdate, async (event) => {
+    assertUpdaterPage(event.senderFrame?.url);
+    return requireUpdater().installUpdate();
+  });
+  ipcMain.handle(IPC_CHANNELS.activateHarnessUpdate, async (event) => {
+    assertUpdaterPage(event.senderFrame?.url);
+    const manager = requireUpdater();
+    const targetVersion = await manager.activateInstalledVersion();
+    const running = await startHarness();
+    if (running?.version !== targetVersion && manager.state.phase !== "failed") {
+      manager.markActivationFailed(targetVersion, currentState.details ?? "目标版本未能启动。");
+    }
+    return manager.state;
+  });
+}
+
+function registerApplicationMenu(): void {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: app.name,
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" }
+      ]
+    },
+    {
+      label: "Harness",
+      submenu: [
+        {
+          label: "检查 Harness 更新…",
+          accelerator: "CommandOrControl+Shift+U",
+          click: () => void windowManager.showUpdater()
+        },
+        {
+          label: "重新启动 Harness",
+          click: () => void startHarness()
+        },
+        { type: "separator" },
+        {
+          label: "打开日志目录",
+          click: () => void shell.openPath(app.getPath("logs"))
+        }
+      ]
+    },
+    { role: "editMenu" },
+    { role: "windowMenu" }
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 function registerLifecycle(): void {
@@ -125,7 +237,19 @@ async function shutdown(): Promise<void> {
 }
 
 function assertStartupPage(url: string | undefined): void {
-  if (!url?.startsWith("file:") || !url.endsWith("/startup.html")) {
-    throw new Error("This operation is available only from the DHDesk startup page.");
-  }
+  assertLocalPage(url, ["startup.html"]);
+}
+
+function assertUpdaterPage(url: string | undefined): void {
+  assertLocalPage(url, ["updater.html"]);
+}
+
+function assertLocalPage(url: string | undefined, allowedPages: string[]): void {
+  const allowed = allowedPages.map((page) => pathToFileURL(join(__dirname, "../renderer", page)).href);
+  if (!url || !allowed.includes(url)) throw new Error("This operation is not available from the current page.");
+}
+
+function requireUpdater(): HarnessUpdater {
+  if (!updater) throw new Error("Harness 更新服务尚未准备完成。");
+  return updater;
 }

@@ -1,11 +1,12 @@
 import { BrowserWindow, shell } from "electron";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
-import type { RuntimeSnapshot } from "../shared/contracts";
+import type { HarnessUpdateSnapshot, RuntimeSnapshot } from "../shared/contracts";
 import { IPC_CHANNELS } from "../shared/contracts";
 
 export class WindowManager {
   private window?: BrowserWindow;
+  private updaterWindow?: BrowserWindow;
   private harnessOrigin?: string;
   private snapshot: RuntimeSnapshot = { phase: "idle", message: "准备启动" };
 
@@ -65,11 +66,57 @@ export class WindowManager {
     await window.loadURL(url);
   }
 
+  async showUpdater(): Promise<void> {
+    if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
+      this.updaterWindow.show();
+      this.updaterWindow.focus();
+      return;
+    }
+
+    const updaterPath = join(__dirname, "../renderer/updater.html");
+    const updaterUrl = pathToFileURL(updaterPath).href;
+    const updaterWindow = new BrowserWindow({
+      width: 680,
+      height: 720,
+      minWidth: 620,
+      minHeight: 650,
+      parent: this.window,
+      show: false,
+      backgroundColor: "#0b0d12",
+      webPreferences: {
+        preload: join(__dirname, "../preload/index.js"),
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        webviewTag: false
+      }
+    });
+    this.updaterWindow = updaterWindow;
+    updaterWindow.setWindowButtonVisibility(true);
+    updaterWindow.setTitle("Harness 更新");
+    updaterWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    updaterWindow.webContents.on("will-navigate", (event, url) => {
+      if (url === updaterUrl) return;
+      event.preventDefault();
+    });
+    updaterWindow.once("ready-to-show", () => updaterWindow.show());
+    updaterWindow.on("closed", () => {
+      this.updaterWindow = undefined;
+    });
+    await updaterWindow.loadFile(updaterPath);
+  }
+
   publishState(snapshot: RuntimeSnapshot): void {
     this.snapshot = snapshot;
     const window = this.window;
     if (!window || window.isDestroyed()) return;
     window.webContents.send(IPC_CHANNELS.runtimeState, snapshot);
+  }
+
+  publishUpdateState(snapshot: HarnessUpdateSnapshot): void {
+    const window = this.updaterWindow;
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send(IPC_CHANNELS.harnessUpdateState, snapshot);
   }
 
   getState(): RuntimeSnapshot {

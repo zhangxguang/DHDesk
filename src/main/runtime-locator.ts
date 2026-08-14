@@ -1,5 +1,6 @@
 import { access, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { readActiveRuntime } from "./active-runtime";
 
 const DSH_PACKAGE_PATH = join("node_modules", "@deepseek-ai", "dsh");
 const DSH_ENTRY_PATH = join(DSH_PACKAGE_PATH, "lib", "bin.js");
@@ -9,6 +10,8 @@ export interface RuntimeInstallation {
   rootPath: string;
   version: string;
   source: "override" | "managed" | "bundled" | "development";
+  pendingValidation?: boolean;
+  previousVersion?: string;
 }
 
 export interface RuntimeLocatorOptions {
@@ -23,8 +26,21 @@ export interface NodeRuntime {
   electronAsNode: boolean;
 }
 
+export async function locateNpmCli(options: { appRoot: string; resourcesPath: string }): Promise<string> {
+  const candidates = [
+    join(options.resourcesPath, "node", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    join(options.appRoot, "resources", "node", "lib", "node_modules", "npm", "bin", "npm-cli.js")
+  ];
+  for (const candidate of candidates) {
+    if (await exists(candidate)) return candidate;
+  }
+  throw new Error("未找到内置 npm，无法安装 Harness 更新。");
+}
+
 export async function locateHarnessRuntime(options: RuntimeLocatorOptions): Promise<RuntimeInstallation> {
-  const candidates: Array<{ entryPath: string; rootPath: string; source: RuntimeInstallation["source"] }> = [];
+  const candidates: Array<
+    Pick<RuntimeInstallation, "entryPath" | "rootPath" | "source" | "pendingValidation" | "previousVersion">
+  > = [];
 
   if (options.entryOverride) {
     candidates.push({
@@ -34,10 +50,16 @@ export async function locateHarnessRuntime(options: RuntimeLocatorOptions): Prom
     });
   }
 
-  const activeVersion = await readActiveVersion(options.userDataPath);
-  if (activeVersion) {
-    const rootPath = join(options.userDataPath, "runtimes", activeVersion);
-    candidates.push({ entryPath: join(rootPath, DSH_ENTRY_PATH), rootPath, source: "managed" });
+  const activeRuntime = await readActiveRuntime(options.userDataPath);
+  if (activeRuntime) {
+    const rootPath = join(options.userDataPath, "runtimes", activeRuntime.version);
+    candidates.push({
+      entryPath: join(rootPath, DSH_ENTRY_PATH),
+      rootPath,
+      source: "managed",
+      pendingValidation: activeRuntime.pendingValidation,
+      previousVersion: activeRuntime.previousVersion
+    });
   }
 
   const bundledRoot = join(options.resourcesPath, "bundled-runtime");
@@ -92,17 +114,6 @@ export async function locateNodeRuntime(options: {
   }
 
   throw new Error("未找到可用的内置 Node.js Runtime。请运行 npm run runtime:prepare:node。");
-}
-
-async function readActiveVersion(userDataPath: string): Promise<string | undefined> {
-  try {
-    const content = JSON.parse(await readFile(join(userDataPath, "active-runtime.json"), "utf8")) as {
-      version?: unknown;
-    };
-    return typeof content.version === "string" && content.version.length > 0 ? content.version : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 async function readHarnessVersion(runtimeRoot: string): Promise<string> {

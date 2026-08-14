@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+    <title>Harness 更新</title>
+    <link rel="stylesheet" href="./updater.css" />
+  </head>
+  <body>
+    <main class="update-shell">
+      <header>
+        <div class="symbol" aria-hidden="true"><span></span></div>
+        <div>
+          <p class="eyebrow">DHDESK RUNTIME MANAGER</p>
+          <h1>Harness 更新</h1>
+          <p class="lede">在不依赖终端的情况下安装、验证并切换 DeepSeek Harness。</p>
+        </div>
+      </header>
+
+      <section class="version-panel" aria-label="版本信息">
+        <div>
+          <span class="label">当前版本</span>
+          <strong id="current-version">—</strong>
+        </div>
+        <span class="version-arrow" aria-hidden="true">→</span>
+        <div>
+          <span class="label">Registry 最新版本</span>
+          <strong id="latest-version">尚未检查</strong>
+        </div>
+      </section>
+
+      <section class="status-panel" aria-live="polite">
+        <div class="status-heading">
+          <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+          <span id="status-message">正在读取 Runtime 状态</span>
+          <span class="percent" id="progress-percent"></span>
+        </div>
+        <div class="progress-track" id="progress-track" hidden>
+          <span id="progress-bar"></span>
+        </div>
+        <p class="details" id="status-details">检查更新不会中断当前正在运行的 Harness。</p>
+      </section>
+
+      <div class="actions">
+        <button class="primary-action" id="action-button" type="button">检查更新</button>
+        <button class="secondary-action" id="check-button" type="button" hidden>重新检查</button>
+        <button class="text-action" id="logs-button" type="button">查看日志</button>
+      </div>
+
+      <aside class="safety-note">
+        <span class="shield" aria-hidden="true">✓</span>
+        <div>
+          <strong>安全切换</strong>
+          <p>下载包会经过 SHA-512 校验和隔离启动测试。只有点击“重启并使用”后才会切换；启动失败会自动恢复上一版本。</p>
+        </div>
+      </aside>
+
+      <footer>
+        <span>更新通道：npm latest</span>
+        <span>用户数据保留在 ~/.dsh</span>
+      </footer>
+    </main>
+    <script type="module" src="./updater.js"></script>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 {
   "name": "dhdesk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "A macOS and Windows desktop launcher and runtime manager for DeepSeek Harness.",
   "author": "zxg",

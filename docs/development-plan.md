@@ -2,13 +2,13 @@
 
 > 目标平台：macOS 14+ arm64、Windows 10 22H2 / Windows 11 x64
 >
-> 当前版本：`0.1.0`
+> 当前版本：`0.1.1`
 >
 > 当前分支：`feature/windows-support`
 >
 > 最后同步：2026-08-14
 >
-> 状态依据：当前仓库源码、25 项自动化测试及 GitHub Actions 双平台成功构建
+> 状态依据：当前仓库源码、30 项自动化测试及 GitHub Actions 双平台成功构建
 
 ## 1. 项目概述
 

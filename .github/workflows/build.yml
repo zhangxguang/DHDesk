@@ -176,7 +176,9 @@ jobs:
         run: |
           set -euo pipefail
           export CSC_KEYCHAIN="${DHDESK_KEYCHAIN_PATH}"
-          export CSC_NAME="${DHDESK_DEVELOPER_ID_NAME}"
+          # electron-builder expects the identity name without its certificate-type prefix.
+          # The exact SHA-1 and full subject were already validated in the temporary keychain.
+          export CSC_NAME="${DHDESK_DEVELOPER_ID_NAME#Developer ID Application: }"
           export APPLE_API_KEY="${DHDESK_API_KEY_PATH}"
           npm run package:dmg
 

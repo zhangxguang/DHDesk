@@ -253,6 +253,7 @@ function registerLifecycle(): void {
     if (isQuitting) return;
     event.preventDefault();
     isQuitting = true;
+    windowManager.prepareToQuit();
     void shutdown().finally(() => {
       app.removeAllListeners("before-quit");
       app.quit();

@@ -3,11 +3,13 @@ import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import type { HarnessUpdateSnapshot, RuntimeSnapshot } from "../shared/contracts";
 import { IPC_CHANNELS } from "../shared/contracts";
+import { shouldMinimizeOnClose } from "./window-behavior";
 
 export class WindowManager {
   private window?: BrowserWindow;
   private updaterWindow?: BrowserWindow;
   private harnessOrigin?: string;
+  private appQuitting = false;
   private snapshot: RuntimeSnapshot = { phase: "idle", message: "准备启动" };
 
   create(): BrowserWindow {
@@ -43,6 +45,11 @@ export class WindowManager {
     window.webContents.on("will-attach-webview", (event) => event.preventDefault());
     window.webContents.on("dom-ready", () => {
       if (window.webContents.getURL().startsWith("file:")) this.publishState(this.snapshot);
+    });
+    window.on("close", (event) => {
+      if (!shouldMinimizeOnClose(process.platform, this.appQuitting)) return;
+      event.preventDefault();
+      window.minimize();
     });
 
     window.on("closed", () => {
@@ -121,6 +128,10 @@ export class WindowManager {
 
   getState(): RuntimeSnapshot {
     return { ...this.snapshot };
+  }
+
+  prepareToQuit(): void {
+    this.appQuitting = true;
   }
 
   focus(): void {

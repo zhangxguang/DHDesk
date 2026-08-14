@@ -1,0 +1,21 @@
+appId: com.zxg.dhdesk
+productName: DHDesk
+copyright: Copyright © 2026 zxg
+asar: true
+directories:
+  output: release
+publish:
+  provider: github
+  owner: zhangxguang
+  repo: DHDesk
+  releaseType: release
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  - from: resources/bundled-runtime
+    to: bundled-runtime
+    filter:
+      - package.json
+      - package-lock.json
+      - runtime-platform.json

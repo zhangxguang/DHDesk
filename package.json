@@ -1,10 +1,14 @@
 {
   "name": "dhdesk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
-  "description": "A macOS desktop launcher and runtime manager for DeepSeek Harness.",
+  "description": "A macOS and Windows desktop launcher and runtime manager for DeepSeek Harness.",
   "author": "zxg",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhangxguang/DHDesk.git"
+  },
   "main": "dist/main/app.js",
   "scripts": {
     "build": "npm run clean && npm run build:main && npm run build:renderer && npm run copy:static",
@@ -20,8 +24,14 @@
     "runtime:prepare": "npm run runtime:prepare:node && npm run runtime:prepare:harness",
     "runtime:prepare:node": "node scripts/prepare-node-runtime.mjs",
     "runtime:prepare:harness": "node scripts/prepare-harness-runtime.mjs",
-    "package:dir": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir --mac",
-    "package:dmg": "npm run build && electron-builder --mac dmg"
+    "artifacts:checksums": "node scripts/write-artifact-checksums.mjs",
+    "package:dir": "npm run package:dir:mac",
+    "package:dir:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir --mac -c electron-builder.mac.yml",
+    "package:dir:win": "npm run build && electron-builder --dir --win --x64 -c electron-builder.win.yml",
+    "package:dmg": "npm run build && electron-builder --mac dmg --arm64 -c electron-builder.mac.yml --publish never",
+    "package:dmg:ci": "npm run package:dmg -- --config.mac.identity=-",
+    "package:mac:release": "npm run build && electron-builder --mac dmg zip --arm64 -c electron-builder.mac.yml --publish never",
+    "package:nsis": "npm run build && electron-builder --win nsis --x64 -c electron-builder.win.yml --publish never"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -32,5 +42,8 @@
   },
   "engines": {
     "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

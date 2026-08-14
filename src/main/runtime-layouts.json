@@ -1,0 +1,24 @@
+{
+  "darwin-arm64": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "nodeArchiveFormat": "tar.xz",
+    "nodeArchiveSuffix": "darwin-arm64.tar.xz",
+    "nodeArchiveDirectorySuffix": "darwin-arm64",
+    "nodeExecutableParts": ["bin", "node"],
+    "npmCliParts": ["lib", "node_modules", "npm", "bin", "npm-cli.js"],
+    "npmCommandParts": ["bin", "npm"],
+    "npxCommandParts": ["bin", "npx"]
+  },
+  "win32-x64": {
+    "platform": "win32",
+    "arch": "x64",
+    "nodeArchiveFormat": "zip",
+    "nodeArchiveSuffix": "win-x64.zip",
+    "nodeArchiveDirectorySuffix": "win-x64",
+    "nodeExecutableParts": ["node.exe"],
+    "npmCliParts": ["node_modules", "npm", "bin", "npm-cli.js"],
+    "npmCommandParts": ["npm.cmd"],
+    "npxCommandParts": ["npx.cmd"]
+  }
+}

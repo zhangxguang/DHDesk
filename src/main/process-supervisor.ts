@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
 import type { RuntimeSnapshot } from "../shared/contracts";
 import type { RuntimeLogger } from "./logging";
+import { terminateProcessTree } from "./process-tree";
 
 const DEFAULT_START_TIMEOUT_MS = 45_000;
 const DEFAULT_STOP_TIMEOUT_MS = 5_000;
@@ -60,7 +61,8 @@ export class HarnessProcessSupervisor extends EventEmitter {
         cwd: this.options.cwd,
         env: environment,
         stdio: ["pipe", "pipe", "pipe"],
-        detached: process.platform !== "win32"
+        detached: process.platform !== "win32",
+        windowsHide: process.platform === "win32"
       }
     );
     child.stdin.end();
@@ -78,7 +80,7 @@ export class HarnessProcessSupervisor extends EventEmitter {
         settled = true;
         const error = new Error("Harness 启动超时，未获得可用的本地服务地址。");
         this.fail(error);
-        void this.stop().finally(() => rejectPromise(error));
+        void this.stopAfterStartupFailure().finally(() => rejectPromise(error));
       }, this.options.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS);
 
       const rejectStartup = (error: Error): void => {
@@ -87,6 +89,7 @@ export class HarnessProcessSupervisor extends EventEmitter {
         clearTimeout(timeout);
         this.fail(error);
         rejectPromise(error);
+        if (this.child) void this.stopAfterStartupFailure();
       };
 
       consumeLines(child.stdout, (line) => {
@@ -146,14 +149,10 @@ export class HarnessProcessSupervisor extends EventEmitter {
 
     this.stopRequested = true;
     this.setState({ phase: "stopping", message: "正在安全停止 Harness", version: this.options.version });
-    signalChild(child, "SIGTERM");
-
-    const exited = await waitForExit(child, this.options.stopTimeoutMs ?? DEFAULT_STOP_TIMEOUT_MS);
-    if (!exited) {
-      await this.options.logger.error("Harness did not stop in time; sending SIGKILL.");
-      signalChild(child, "SIGKILL");
-      await waitForExit(child, 1_000);
-    }
+    await terminateProcessTree(child, {
+      gracefulTimeoutMs: this.options.stopTimeoutMs ?? DEFAULT_STOP_TIMEOUT_MS,
+      forceTimeoutMs: 1_000
+    });
   }
 
   private fail(error: Error): void {
@@ -164,6 +163,16 @@ export class HarnessProcessSupervisor extends EventEmitter {
       version: this.options.version,
       details: error.message
     });
+  }
+
+  private async stopAfterStartupFailure(): Promise<void> {
+    try {
+      await this.stop();
+    } catch (error) {
+      await this.options.logger.error(
+        `Failed to terminate Harness after startup failure: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   private setState(snapshot: RuntimeSnapshot): void {
@@ -208,32 +217,6 @@ async function waitForHttpReady(url: string, timeoutMs: number): Promise<void> {
   }
 
   throw asError(lastError, "Harness Web UI 未通过健康检查。");
-}
-
-function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {
-  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
-
-  return new Promise((resolvePromise) => {
-    const timer = setTimeout(() => {
-      child.removeListener("exit", onExit);
-      resolvePromise(false);
-    }, timeoutMs);
-    const onExit = (): void => {
-      clearTimeout(timer);
-      resolvePromise(true);
-    };
-    child.once("exit", onExit);
-  });
-}
-
-function signalChild(child: ChildProcessWithoutNullStreams, signal: NodeJS.Signals): void {
-  if (!child.pid) return;
-  try {
-    if (process.platform === "win32") child.kill(signal);
-    else process.kill(-child.pid, signal);
-  } catch {
-    child.kill(signal);
-  }
 }
 
 function asError(error: unknown, fallback: string): Error {

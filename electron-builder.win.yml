@@ -1,0 +1,49 @@
+extends: electron-builder.base.yml
+extraResources:
+  - from: resources/node
+    to: node
+    filter:
+      - node.exe
+      - npm.cmd
+      - npx.cmd
+      - LICENSE
+  - from: resources/node/node_modules/npm
+    to: node/node_modules/npm
+    filter:
+      - "**/*"
+      - "!**/*.d.ts"
+      - "!**/*.map"
+      - "!**/{test,tests,__tests__,example,examples}/**/*"
+      - "!**/{README,README.*,readme,readme.*,CHANGELOG,CHANGELOG.*,changelog,changelog.*,HISTORY,HISTORY.*,history,history.*,CONTRIBUTING,CONTRIBUTING.*,contributing,contributing.*}"
+  # electron-builder skips a source directory named node_modules by default.
+  - from: resources/bundled-runtime/node_modules
+    to: bundled-runtime/node_modules
+    filter:
+      - "**/*"
+      - "!**/*.d.ts"
+      - "!**/*.map"
+      - "!**/{test,tests,__tests__,example,examples}/**/*"
+      - "!**/{README,README.*,readme,readme.*,CHANGELOG,CHANGELOG.*,changelog,changelog.*,HISTORY,HISTORY.*,history,history.*,CONTRIBUTING,CONTRIBUTING.*,contributing,contributing.*}"
+      - "!node-pty/prebuilds/darwin-*/**/*"
+      - "!node-pty/prebuilds/linux-*/**/*"
+      - "!node-pty/prebuilds/win32-arm64/**/*"
+win:
+  icon: resources/icons/app-icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  # electron-builder 26 only emits an actual ZIP payload when differential
+  # packaging is disabled. Otherwise NSIS tries to open a 7z payload as ZIP.
+  differentialPackage: false
+  # Prefer faster extraction over the smaller 7z archive. The bundled Runtime
+  # contains thousands of small files, so installation latency matters more.
+  useZip: true
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+  installerIcon: resources/icons/app-icon.ico
+  uninstallerIcon: resources/icons/app-icon.ico
+  artifactName: "DHDesk-${version}-win-${arch}-setup.${ext}"

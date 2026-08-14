@@ -1,17 +1,22 @@
 import { app, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
+import { autoUpdater } from "electron-updater";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { RuntimeSnapshot } from "../shared/contracts";
 import { IPC_CHANNELS } from "../shared/contracts";
 import { confirmActiveRuntime, rollbackActiveRuntime } from "./active-runtime";
+import { DesktopUpdater } from "./desktop-updater";
 import { HarnessUpdater } from "./harness-updater";
 import { RuntimeLogger } from "./logging";
+import { ensureRuntimePlatformMetadata } from "./runtime-metadata";
 import { HarnessProcessSupervisor } from "./process-supervisor";
 import {
+  inspectNodeRuntime,
   locateHarnessRuntime,
   locateNodeRuntime,
   locateNpmCli,
+  type NodeRuntimeIdentity,
   type RuntimeInstallation
 } from "./runtime-locator";
 import { WindowManager } from "./window-manager";
@@ -28,6 +33,7 @@ if (!hasSingleInstanceLock) {
 let windowManager: WindowManager;
 let supervisor: HarnessProcessSupervisor | undefined;
 let updater: HarnessUpdater | undefined;
+let desktopUpdater: DesktopUpdater;
 let logger: RuntimeLogger;
 let isQuitting = false;
 let currentState: RuntimeSnapshot = { phase: "idle", message: "准备启动" };
@@ -37,6 +43,13 @@ async function bootstrap(): Promise<void> {
 
   logger = new RuntimeLogger(join(app.getPath("logs"), "harness.log"));
   windowManager = new WindowManager();
+  desktopUpdater = new DesktopUpdater({
+    currentVersion: app.getVersion(),
+    isPackaged: app.isPackaged,
+    client: autoUpdater,
+    logger
+  });
+  desktopUpdater.on("state", (snapshot) => windowManager.publishDesktopUpdateState(snapshot));
   registerIpc();
   registerLifecycle();
   registerApplicationMenu();
@@ -53,12 +66,6 @@ async function startHarness(options: { allowPendingRollback?: boolean } = {}): P
   try {
     const appRoot = app.getAppPath();
     const resourcesPath = process.resourcesPath;
-    runtime = await locateHarnessRuntime({
-      appRoot,
-      resourcesPath,
-      userDataPath: app.getPath("userData"),
-      entryOverride: process.env.DHDESK_DSH_ENTRY
-    });
     const node = await locateNodeRuntime({
       appRoot,
       resourcesPath,
@@ -66,7 +73,17 @@ async function startHarness(options: { allowPendingRollback?: boolean } = {}): P
       electronExecutable: process.execPath,
       isElectron: Boolean(process.versions.electron)
     });
-    await ensureUpdater(runtime, node.executablePath, appRoot, resourcesPath);
+    const nodeIdentity = await inspectNodeRuntime(node);
+    runtime = await locateHarnessRuntime({
+      appRoot,
+      resourcesPath,
+      userDataPath: app.getPath("userData"),
+      entryOverride: process.env.DHDESK_DSH_ENTRY,
+      platform: nodeIdentity.platform,
+      arch: nodeIdentity.arch,
+      nodeVersion: nodeIdentity.version
+    });
+    await ensureUpdater(runtime, node.executablePath, nodeIdentity, appRoot, resourcesPath);
 
     await logger.info(`Resolved Harness ${runtime.version} from ${runtime.source}: ${runtime.entryPath}`);
     supervisor = new HarnessProcessSupervisor({
@@ -91,6 +108,16 @@ async function startHarness(options: { allowPendingRollback?: boolean } = {}): P
       await new Promise((resolvePromise) => setTimeout(resolvePromise, Math.min(startupHoldMs, 30_000)));
     }
     if (running.url) await windowManager.loadHarness(running.url);
+    if (runtime.source === "managed" && runtime.metadataMissing) {
+      await ensureRuntimePlatformMetadata(runtime.rootPath, {
+        platform: nodeIdentity.platform,
+        arch: nodeIdentity.arch,
+        nodeVersion: nodeIdentity.version,
+        harnessVersion: runtime.version
+      });
+      runtime = { ...runtime, metadataMissing: false };
+      await logger.info(`Added missing platform metadata for managed Harness runtime ${runtime.version}`);
+    }
     if (runtime.source === "managed" && runtime.pendingValidation) {
       await confirmActiveRuntime(app.getPath("userData"), runtime.version);
       runtime = { ...runtime, pendingValidation: false };
@@ -119,6 +146,7 @@ async function startHarness(options: { allowPendingRollback?: boolean } = {}): P
 async function ensureUpdater(
   runtime: RuntimeInstallation,
   nodeExecutable: string,
+  nodeIdentity: NodeRuntimeIdentity,
   appRoot: string,
   resourcesPath: string
 ): Promise<void> {
@@ -128,6 +156,7 @@ async function ensureUpdater(
     userDataPath: app.getPath("userData"),
     nodeExecutable,
     npmCliPath,
+    nodeIdentity,
     currentRuntime: runtime,
     logger,
     registryUrl: process.env.DHDESK_NPM_REGISTRY
@@ -150,7 +179,7 @@ function registerIpc(): void {
     await startHarness();
   });
   ipcMain.handle(IPC_CHANNELS.openLogs, async (event) => {
-    assertLocalPage(event.senderFrame?.url, ["startup.html", "updater.html"]);
+    assertLocalPage(event.senderFrame?.url, ["startup.html", "updater.html", "app-updater.html"]);
     await shell.openPath(app.getPath("logs"));
   });
   ipcMain.handle(IPC_CHANNELS.harnessUpdateState, (event) => {
@@ -175,54 +204,102 @@ function registerIpc(): void {
     }
     return manager.state;
   });
+  ipcMain.handle(IPC_CHANNELS.desktopUpdateState, (event) => {
+    assertDesktopUpdaterPage(event.senderFrame?.url);
+    return desktopUpdater.state;
+  });
+  ipcMain.handle(IPC_CHANNELS.checkDesktopUpdate, async (event) => {
+    assertDesktopUpdaterPage(event.senderFrame?.url);
+    return desktopUpdater.checkForUpdates();
+  });
+  ipcMain.handle(IPC_CHANNELS.downloadDesktopUpdate, async (event) => {
+    assertDesktopUpdaterPage(event.senderFrame?.url);
+    return desktopUpdater.downloadUpdate();
+  });
+  ipcMain.handle(IPC_CHANNELS.installDesktopUpdate, async (event) => {
+    assertDesktopUpdaterPage(event.senderFrame?.url);
+    if (desktopUpdater.state.phase !== "downloaded") throw new Error("DHDesk 更新尚未下载完成。");
+    await shutdown();
+    isQuitting = true;
+    windowManager.prepareToQuit();
+    desktopUpdater.quitAndInstall();
+  });
 }
 
 function registerApplicationMenu(): void {
-  const template: MenuItemConstructorOptions[] = [
-    {
-      label: app.name,
-      submenu: [
-        { role: "about" },
-        { type: "separator" },
-        { role: "hide" },
-        { role: "hideOthers" },
-        { role: "unhide" },
-        { type: "separator" },
-        { role: "quit" }
+  const harnessMenu: MenuItemConstructorOptions = {
+    label: "Harness",
+    submenu: [
+      {
+        label: "检查 Harness 更新…",
+        accelerator: "CommandOrControl+Shift+U",
+        click: () => void windowManager.showUpdater()
+      },
+      {
+        label: "重新启动 Harness",
+        click: () => void startHarness()
+      },
+      { type: "separator" },
+      {
+        label: "打开日志目录",
+        click: () => void shell.openPath(app.getPath("logs"))
+      }
+    ]
+  };
+  const template: MenuItemConstructorOptions[] = process.platform === "darwin"
+    ? [
+        {
+          label: app.name,
+          submenu: [
+            { role: "about" },
+            {
+              label: "检查 DHDesk 更新…",
+              accelerator: "CommandOrControl+Alt+U",
+              click: () => void windowManager.showDesktopUpdater()
+            },
+            { type: "separator" },
+            { role: "hide" },
+            { role: "hideOthers" },
+            { role: "unhide" },
+            { type: "separator" },
+            { role: "quit" }
+          ]
+        },
+        harnessMenu,
+        { role: "editMenu" },
+        { role: "windowMenu" }
       ]
-    },
-    {
-      label: "Harness",
-      submenu: [
+    : [
         {
-          label: "检查 Harness 更新…",
-          accelerator: "CommandOrControl+Shift+U",
-          click: () => void windowManager.showUpdater()
+          label: "文件",
+          submenu: [{ role: "quit", label: "退出" }]
         },
+        harnessMenu,
+        { role: "editMenu" },
+        { role: "windowMenu" },
         {
-          label: "重新启动 Harness",
-          click: () => void startHarness()
-        },
-        { type: "separator" },
-        {
-          label: "打开日志目录",
-          click: () => void shell.openPath(app.getPath("logs"))
+          label: "帮助",
+          submenu: [
+            {
+              label: "检查 DHDesk 更新…",
+              accelerator: "CommandOrControl+Alt+U",
+              click: () => void windowManager.showDesktopUpdater()
+            }
+          ]
         }
-      ]
-    },
-    { role: "editMenu" },
-    { role: "windowMenu" }
-  ];
+      ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 function registerLifecycle(): void {
   app.on("second-instance", () => windowManager.focus());
+  app.on("activate", () => windowManager.focus());
   app.on("window-all-closed", () => app.quit());
   app.on("before-quit", (event) => {
     if (isQuitting) return;
     event.preventDefault();
     isQuitting = true;
+    windowManager.prepareToQuit();
     void shutdown().finally(() => {
       app.removeAllListeners("before-quit");
       app.quit();
@@ -242,6 +319,10 @@ function assertStartupPage(url: string | undefined): void {
 
 function assertUpdaterPage(url: string | undefined): void {
   assertLocalPage(url, ["updater.html"]);
+}
+
+function assertDesktopUpdaterPage(url: string | undefined): void {
+  assertLocalPage(url, ["app-updater.html"]);
 }
 
 function assertLocalPage(url: string | undefined, allowedPages: string[]): void {

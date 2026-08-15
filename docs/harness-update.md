@@ -3,7 +3,7 @@
 ## 使用方式
 
 1. 启动 DHDesk。
-2. 选择菜单 `Harness > 检查 Harness 更新…`，或按 `⌘⇧U`。
+2. 选择菜单 `Harness > 检查 Harness 更新…`，或在 macOS 按 `⌘⇧U`、Windows 按 `Ctrl+Shift+U`。
 3. 发现新版本后点击“下载并验证”。当前 Harness 会继续运行。
 4. 验证完成后点击“重启并使用”。如果暂时不想切换，直接关闭更新窗口即可。
 
@@ -24,13 +24,15 @@ flowchart LR
 
 ## 文件位置
 
-- 已安装 Runtime：`~/Library/Application Support/DHDesk/runtimes/<version>/`
-- 激活记录：`~/Library/Application Support/DHDesk/active-runtime.json`
-- npm 缓存：`~/Library/Application Support/DHDesk/npm-cache/`
-- 运行日志：`~/Library/Logs/DHDesk/harness.log`
-- Harness 用户数据：`~/.dsh/`
+| 用途 | macOS | Windows |
+|---|---|---|
+| 已安装 Runtime | `~/Library/Application Support/DHDesk/runtimes/<version>/` | `%APPDATA%\DHDesk\runtimes\<version>\` |
+| 激活记录 | `~/Library/Application Support/DHDesk/active-runtime.json` | `%APPDATA%\DHDesk\active-runtime.json` |
+| npm 缓存 | `~/Library/Application Support/DHDesk/npm-cache/` | `%APPDATA%\DHDesk\npm-cache\` |
+| 运行日志 | `~/Library/Logs/DHDesk/harness.log` | `%APPDATA%\DHDesk\logs\harness.log` |
+| Harness 用户数据 | `~/.dsh/` | `%USERPROFILE%\.dsh\` |
 
-Runtime 与用户数据分离。下载安装和失败清理只操作 DHDesk 的应用数据目录，不修改 `~/.dsh`。
+Runtime 与用户数据分离。下载安装和失败清理只操作 DHDesk 的应用数据目录，不修改上表中的 Harness 用户数据目录。
 
 ## 安全和恢复策略
 

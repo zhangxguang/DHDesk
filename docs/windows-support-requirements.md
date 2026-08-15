@@ -4,7 +4,7 @@
 > 目标平台：macOS arm64 + Windows x64  
 > 对应分支：已合并至 `main`
 > 文档状态：实施中
-> 最后更新：2026-08-14
+> 最后更新：2026-08-15
 
 ## 1. 拆分目标
 
@@ -20,7 +20,7 @@
 
 ### 1.1 当前实施状态
 
-> 状态更新时间：2026-08-14
+> 状态更新时间：2026-08-15
 
 | Epic | 当前状态 | 已完成 | 仍需验证/决策 |
 |---|---|---|---|
@@ -31,7 +31,7 @@
 | E4 进程生命周期 | 已实现 | `windowsHide`、统一进程树终止、taskkill 参数及原生进程终止测试 | Windows 下无闪窗、无 `conhost.exe` 残留验收 |
 | E5 UI 适配 | 已实现平台分支 | macOS/Windows 菜单分支、macOS 窗口按钮 API 隔离 | Windows 高 DPI 和按钮命中手工验收 |
 | E6 打包与 NSIS | macOS 已验证 | builder 配置拆分、`extends` 合并、平台资源过滤、多尺寸 ICO、DMG 构建 | Windows NSIS 原生构建；DEC-001 最终确认 |
-| E7 测试与 CI | 已运行 | 35 个本地测试、双平台 GitHub Actions、安装冒烟测试、SHA-256 产物文件 | 双平台真机回归 |
+| E7 测试与 CI | 已运行 | 36 个本地测试、双平台 GitHub Actions、安装冒烟测试、SHA-256 产物文件、macOS/Windows 0.1.1 → 0.1.2 真机更新验收 | 双平台完整兼容回归 |
 | E8 签名发布 | 部分完成 | macOS Developer ID 签名、公证、Stapling、Gatekeeper 验证；Tag Release 流程 | Windows 签名方案和双平台真机验收 |
 
 “已实现”表示代码与本地自动化检查完成，不等于 Windows 原生验收完成。Windows 相关需求只有在目标 Runner 或干净 Windows 机器通过后才能勾选最终验收项。

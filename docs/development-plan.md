@@ -6,9 +6,9 @@
 >
 > 当前分支：`main`
 >
-> 最后同步：2026-08-14
+> 最后同步：2026-08-15
 >
-> 状态依据：当前仓库源码、35 项自动化测试及 GitHub Actions 双平台成功构建
+> 状态依据：当前仓库源码、36 项自动化测试、GitHub Actions 双平台成功构建及 macOS/Windows 0.1.1 → 0.1.2 真机更新验收
 
 ## 1. 项目概述
 
@@ -302,7 +302,8 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] DMG 完成签名和 Stapling 后将 `latest-mac.yml` 收敛为最终 ZIP，重新计算实际大小和 SHA-512，避免发布过期 DMG 元数据。
 - [x] Windows Release 生成 NSIS EXE、Blockmap 和 `latest.yml`。
 - [x] 更新元数据和安装包由 electron-builder 提供 SHA-512 完整性校验。
-- [ ] 在已安装的 macOS 0.1.1 和 Windows 0.1.1 上完成升级到 0.1.2 的真机 UI 验收。
+- [x] 在已安装的 macOS 0.1.1 上完成升级到 0.1.2 的真机 UI 验收。
+- [x] 在已安装的 Windows 0.1.1 上完成升级到 0.1.2 的真机 UI 验收。
 
 ## 6. 双平台 Runtime、打包与 CI
 
@@ -409,22 +410,21 @@ GitHub Actions 使用 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`�
 | 阶段 3 | macOS/Windows Runtime 和安装包 | 已完成内测构建 | 双平台真实机器安装与功能验收 |
 | 阶段 4 | 双平台 CI Artifact | 已完成 | 包内容验证、Action 版本升级 |
 | 阶段 5 | 正式签名、公证和 Release | 部分完成 | macOS 和公开 GitHub Release 已完成；Windows 签名仍待完成 |
-| 阶段 6 | DHDesk 自更新和增强 | 自更新核心完成 | 跨版本安装验收、版本管理页、菜单栏模式 |
+| 阶段 6 | DHDesk 自更新和增强 | 双平台跨版本更新验收完成 | 版本管理页、菜单栏模式 |
 
 ### 8.1 下一阶段优先级
 
 1. 在干净 Windows 10/11 和 macOS 14+ 机器完成安装、启动、退出和 Harness 更新验收。
-2. 完成 DHDesk 从 0.1.1 升级到 0.1.2 的 macOS/Windows 真机 UI 验收。
-3. 确认并接入 Windows Authenticode 或 Azure Trusted Signing。
-4. 完成窗口状态恢复、诊断信息复制、下载处理和完整日志脱敏。
-5. 增加 Harness 更新失败、损坏包、断网和进程残留测试。
-6. 开发已安装 Harness 版本管理页和清理策略。
+2. 确认并接入 Windows Authenticode 或 Azure Trusted Signing。
+3. 完成窗口状态恢复、诊断信息复制、下载处理和完整日志脱敏。
+4. 增加 Harness 更新失败、损坏包、断网和进程残留测试。
+5. 开发已安装 Harness 版本管理页和清理策略。
 
 ## 9. 测试计划与当前覆盖
 
 ### 9.1 已有自动化测试
 
-当前共有 9 个测试文件、35 项测试，覆盖：
+当前共有 10 个测试文件、36 项测试，覆盖：
 
 - [x] 激活 Runtime 原子写入、确认和回滚。
 - [x] Harness 更新状态、版本检查、安装和错误处理。

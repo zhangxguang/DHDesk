@@ -52,13 +52,13 @@
         <span class="shield" aria-hidden="true">✓</span>
         <div>
           <strong>独立更新</strong>
-          <p>DHDesk 更新与 Harness Runtime 更新互不影响。macOS Release 会经过 Developer ID 签名、公证和 Gatekeeper 验证。</p>
+          <p>DHDesk 更新与 Harness Runtime 更新互不影响。更新包会按照 Release 元数据校验 SHA-512 完整性。</p>
         </div>
       </aside>
 
       <footer>
         <span>更新通道：GitHub Release</span>
-        <span>Harness 与 ~/.dsh 数据不会被删除</span>
+        <span>Harness 与用户数据不会被删除</span>
       </footer>
     </main>
     <script type="module" src="./app-updater.js"></script>

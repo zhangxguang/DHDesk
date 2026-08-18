@@ -213,6 +213,14 @@ jobs:
         if: matrix.platform == 'win32'
         run: npm run package:nsis
 
+      - name: Verify packaged macOS Node/npm Runtime
+        if: matrix.platform == 'darwin'
+        run: node scripts/verify-packaged-node-runtime.mjs release/mac-arm64/DHDesk.app/Contents/Resources/node
+
+      - name: Verify packaged Windows Node/npm Runtime
+        if: matrix.platform == 'win32'
+        run: node scripts/verify-packaged-node-runtime.mjs release/win-unpacked/resources/node
+
       - name: Verify macOS update metadata
         if: matrix.platform == 'darwin' && env.DHDESK_RELEASE_SIGNING == 'true'
         shell: bash

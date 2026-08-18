@@ -15,6 +15,17 @@ extraResources:
       - "!**/*.map"
       - "!**/{test,tests,__tests__,example,examples}/**/*"
       - "!**/{README,README.*,readme,readme.*,CHANGELOG,CHANGELOG.*,changelog,changelog.*,HISTORY,HISTORY.*,history,history.*,CONTRIBUTING,CONTRIBUTING.*,contributing,contributing.*}"
+  # A nested directory named node_modules is skipped by electron-builder's
+  # default traversal. Copy npm's dependency tree from that directory as a
+  # separate resource root so the packaged npm CLI remains executable.
+  - from: resources/node/lib/node_modules/npm/node_modules
+    to: node/lib/node_modules/npm/node_modules
+    filter:
+      - "**/*"
+      - "!**/*.d.ts"
+      - "!**/*.map"
+      - "!**/{test,tests,__tests__,example,examples}/**/*"
+      - "!**/{README,README.*,readme,readme.*,CHANGELOG,CHANGELOG.*,changelog,changelog.*,HISTORY,HISTORY.*,history,history.*,CONTRIBUTING,CONTRIBUTING.*,contributing,contributing.*}"
   # electron-builder skips a source directory named node_modules by default.
   - from: resources/bundled-runtime/node_modules
     to: bundled-runtime/node_modules

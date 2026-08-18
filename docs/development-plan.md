@@ -2,13 +2,13 @@
 
 > 目标平台：macOS 14+ arm64、Windows 10 22H2 / Windows 11 x64
 >
-> 当前版本：`0.1.3`
+> 当前版本：`0.1.4`
 >
 > 当前分支：`main`
 >
-> 最后同步：2026-08-15
+> 最后同步：2026-08-18
 >
-> 状态依据：当前仓库源码、36 项自动化测试、GitHub Actions 双平台成功构建及 macOS/Windows 0.1.1 → 0.1.2 真机更新验收
+> 状态依据：当前仓库源码、38 项自动化测试、GitHub Actions 双平台成功构建及 macOS/Windows 0.1.1 → 0.1.2 真机更新验收
 
 ## 1. 项目概述
 
@@ -327,6 +327,7 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] macOS 只包含 arm64 Runtime 和原生模块。
 - [x] Windows 只包含 x64 Runtime 和原生模块。
 - [x] 打包时排除类型声明、Source Map、README/CHANGELOG、测试和示例文件，减少安装落盘文件数量。
+- [x] npm 依赖树使用独立资源根复制，避免 electron-builder 跳过嵌套 `node_modules`。
 - [x] 配置蓝鲸飞船应用图标的 ICNS、ICO 和 PNG 资源。
 - [x] 生成 `DHDesk-<version>-mac-arm64.dmg`。
 - [x] 生成 macOS 自更新 ZIP、Blockmap 和 `latest-mac.yml`。
@@ -355,6 +356,7 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] 上传 `DHDesk-mac-arm64` 和 `DHDesk-win-x64` Artifacts。
 - [x] CI 构建显式禁用隐式发布和证书自动发现。
 - [x] Windows CI 静默安装 NSIS 包，并验证应用、内置 Node 和 Harness 入口完整。
+- [x] 双平台 CI 使用打包后的 Node/npm 完成版本检查和离线本地依赖安装冒烟测试。
 - [ ] 更新 GitHub Actions 依赖，消除旧 Node.js Action Runtime 警告。
 - [x] 自动验证 macOS App/DMG 签名、Stapling 和 Gatekeeper 状态。
 - [x] 配置 Tag 构建正式 macOS 签名产物，并在双平台验证通过后创建 GitHub Release。
@@ -424,7 +426,7 @@ GitHub Actions 使用 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`�
 
 ### 9.1 已有自动化测试
 
-当前共有 10 个测试文件、36 项测试，覆盖：
+当前共有 11 个测试文件、38 项测试，覆盖：
 
 - [x] 激活 Runtime 原子写入、确认和回滚。
 - [x] Harness 更新状态、版本检查、安装和错误处理。
@@ -435,6 +437,7 @@ GitHub Actions 使用 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`�
 - [x] Windows `taskkill` 参数与平台化进程树逻辑。
 - [x] DHDesk 自更新的开发模式禁用、版本检查、下载进度、失败和重启安装状态。
 - [x] macOS 最终更新元数据只引用 ZIP，并使用实际 SHA-512 和文件大小。
+- [x] 双平台 npm 依赖树打包配置和 CI 冒烟测试接线。
 
 ### 9.2 待补自动化测试
 

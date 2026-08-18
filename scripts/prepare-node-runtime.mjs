@@ -53,12 +53,14 @@ try {
   const extractedNpmCli = join(extracted, ...layout.npmCliParts);
   await Promise.all([access(extractedNode), access(extractedNpmCli)]);
   await verifyNodeIdentity(extractedNode);
+  await verifyNpmCli(extractedNode, extractedNpmCli);
 
   await rm(target, { recursive: true, force: true });
   await cp(extracted, target, { recursive: true });
   if (layout.platform === "darwin") await repairNodeBinLinks(target);
   await Promise.all([access(existingNode), access(npmCli)]);
   await verifyNodeIdentity(existingNode);
+  await verifyNpmCli(existingNode, npmCli);
   process.stdout.write(`Prepared Node.js ${version} for ${layout.target} at ${target}\n`);
 } catch (error) {
   await rm(target, { recursive: true, force: true }).catch(() => undefined);
@@ -73,9 +75,17 @@ async function existingRuntimeIsValid() {
     await Promise.all([access(existingNode), access(npmCli)]);
     if (layout.platform === "darwin") await repairNodeBinLinks(target);
     await verifyNodeIdentity(existingNode);
+    await verifyNpmCli(existingNode, npmCli);
     return true;
   } catch {
     return false;
+  }
+}
+
+async function verifyNpmCli(nodeExecutable, npmCliPath) {
+  const npmVersion = (await runCapture(nodeExecutable, [npmCliPath, "--version"])).trim();
+  if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(npmVersion)) {
+    throw new Error(`npm self-check returned invalid version '${npmVersion || "empty"}'.`);
   }
 }
 

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  createNodeRuntimeEnvironment,
   isNewerVersion,
   parseRegistryMetadata,
   verifyFileIntegrity
@@ -78,6 +79,34 @@ describe("Harness updater integrity", () => {
     await expect(verifyFileIntegrity(path, integrity)).resolves.toBeUndefined();
     await writeFile(path, Buffer.from("modified archive"));
     await expect(verifyFileIntegrity(path, integrity)).rejects.toThrow("不匹配");
+  });
+});
+
+describe("Harness updater Node environment", () => {
+  it("prepends the bundled Node directory for macOS npm lifecycle scripts", () => {
+    const environment = createNodeRuntimeEnvironment(
+      "/Applications/DHDesk.app/Contents/Resources/node/bin/node",
+      "/Applications/DHDesk.app/Contents/Resources/node/lib/node_modules/npm/bin/npm-cli.js",
+      { PATH: "/usr/bin:/bin" },
+      "darwin"
+    );
+
+    expect(environment.PATH).toBe("/Applications/DHDesk.app/Contents/Resources/node/bin:/usr/bin:/bin");
+    expect(environment.NODE).toBe("/Applications/DHDesk.app/Contents/Resources/node/bin/node");
+    expect(environment.npm_node_execpath).toBe(environment.NODE);
+  });
+
+  it("uses the Windows Path key and separator for npm lifecycle scripts", () => {
+    const nodeExecutable = "C:\\Program Files\\DHDesk\\resources\\node\\node.exe";
+    const environment = createNodeRuntimeEnvironment(
+      nodeExecutable,
+      "C:\\Program Files\\DHDesk\\resources\\node\\node_modules\\npm\\bin\\npm-cli.js",
+      { PATH: "C:\\Windows\\System32" },
+      "win32"
+    );
+
+    expect(environment.Path).toBe("C:\\Program Files\\DHDesk\\resources\\node;C:\\Windows\\System32");
+    expect(environment.NODE).toBe(nodeExecutable);
   });
 });
 

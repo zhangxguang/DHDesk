@@ -2,13 +2,13 @@
 
 > 目标平台：macOS 14+ arm64、Windows 10 22H2 / Windows 11 x64
 >
-> 当前版本：`0.1.4`
+> 当前版本：`0.1.5`
 >
 > 当前分支：`main`
 >
 > 最后同步：2026-08-18
 >
-> 状态依据：当前仓库源码、38 项自动化测试、GitHub Actions 双平台成功构建及 macOS/Windows 0.1.1 → 0.1.2 真机更新验收
+> 状态依据：当前仓库源码、40 项自动化测试、GitHub Actions 双平台成功构建及 macOS/Windows 0.1.1 → 0.1.2 真机更新验收
 
 ## 1. 项目概述
 
@@ -266,7 +266,7 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 
 - [x] 下载到独立临时目录。
 - [x] 校验 npm 元数据中的 SHA-512 integrity。
-- [x] 使用应用内置 Node.js 和 npm 安装完整生产依赖。
+- [x] 使用应用内置 Node.js 和 npm 安装完整生产依赖，并将内置 Node 目录加入 npm 生命周期脚本的 `PATH`。
 - [x] 生成并保留 `package-lock.json`。
 - [x] 禁止覆盖现有版本目录。
 - [x] 校验版本号、目录名和下载大小。
@@ -356,7 +356,7 @@ Harness 更新与 DHDesk 自身更新完全分离。当前实现只在用户打�
 - [x] 上传 `DHDesk-mac-arm64` 和 `DHDesk-win-x64` Artifacts。
 - [x] CI 构建显式禁用隐式发布和证书自动发现。
 - [x] Windows CI 静默安装 NSIS 包，并验证应用、内置 Node 和 Harness 入口完整。
-- [x] 双平台 CI 使用打包后的 Node/npm 完成版本检查和离线本地依赖安装冒烟测试。
+- [x] 双平台 CI 使用打包后的 Node/npm 完成版本检查，并实际执行离线依赖的 `node` 生命周期脚本。
 - [ ] 更新 GitHub Actions 依赖，消除旧 Node.js Action Runtime 警告。
 - [x] 自动验证 macOS App/DMG 签名、Stapling 和 Gatekeeper 状态。
 - [x] 配置 Tag 构建正式 macOS 签名产物，并在双平台验证通过后创建 GitHub Release。
@@ -426,7 +426,7 @@ GitHub Actions 使用 `Developer ID Application: xiangguang zhang (2NW8BV74J4)`�
 
 ### 9.1 已有自动化测试
 
-当前共有 11 个测试文件、38 项测试，覆盖：
+当前共有 11 个测试文件、40 项测试，覆盖：
 
 - [x] 激活 Runtime 原子写入、确认和回滚。
 - [x] Harness 更新状态、版本检查、安装和错误处理。

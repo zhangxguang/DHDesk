@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { resolveRuntimeLayout } from "./runtime-platform.mjs";
 
 const nodeRootArgument = process.argv[2];
@@ -46,10 +46,15 @@ try {
       `${JSON.stringify({
         name: "dhdesk-npm-smoke-dependency",
         version: "1.0.0",
-        main: "index.js"
+        main: "index.js",
+        scripts: { install: "node install-smoke.cjs" }
       }, null, 2)}\n`
     ),
-    writeFile(join(dependencyRoot, "index.js"), "module.exports = true;\n")
+    writeFile(join(dependencyRoot, "index.js"), "module.exports = true;\n"),
+    writeFile(
+      join(dependencyRoot, "install-smoke.cjs"),
+      'require("node:fs").writeFileSync("installed-by-node.txt", `${process.execPath}\\n`);\n'
+    )
   ]);
 
   await runCapture(
@@ -58,7 +63,6 @@ try {
       npmCli,
       "install",
       "--offline",
-      "--ignore-scripts",
       "--no-audit",
       "--no-fund",
       "--cache",
@@ -66,7 +70,14 @@ try {
     ],
     applicationRoot
   );
-  await access(join(applicationRoot, "node_modules", "dhdesk-npm-smoke-dependency", "package.json"));
+  const installedDependencyRoot = join(applicationRoot, "node_modules", "dhdesk-npm-smoke-dependency");
+  await access(join(installedDependencyRoot, "package.json"));
+  const lifecycleNode = (await readFile(join(installedDependencyRoot, "installed-by-node.txt"), "utf8")).trim();
+  const [expectedNode, actualNode] = await Promise.all([realpath(nodeExecutable), realpath(lifecycleNode)]);
+  const normalizePath = (value) => process.platform === "win32" ? value.toLowerCase() : value;
+  if (normalizePath(actualNode) !== normalizePath(expectedNode)) {
+    throw new Error(`npm lifecycle used '${lifecycleNode}' instead of packaged Node '${nodeExecutable}'.`);
+  }
   process.stdout.write(`Verified packaged Node/npm Runtime at ${nodeRoot} (npm ${npmVersion}).\n`);
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
@@ -76,11 +87,7 @@ function runCapture(command, args, cwd) {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(command, args, {
       cwd,
-      env: {
-        ...process.env,
-        NO_UPDATE_NOTIFIER: "1",
-        npm_config_update_notifier: "false"
-      },
+      env: createPackagedNodeEnvironment(command, args[0]),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: process.platform === "win32"
     });
@@ -111,4 +118,23 @@ function runCapture(command, args, cwd) {
       }
     });
   });
+}
+
+function createPackagedNodeEnvironment(nodeExecutablePath, npmCliPath) {
+  const environment = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => key.toLowerCase() !== "path")
+  );
+  const pathKey = process.platform === "win32" ? "Path" : "PATH";
+  const systemPaths = process.platform === "win32"
+    ? [join(process.env.SystemRoot ?? "C:\\Windows", "System32"), process.env.SystemRoot ?? "C:\\Windows"]
+    : ["/usr/bin", "/bin", "/usr/sbin", "/sbin"];
+  return {
+    ...environment,
+    [pathKey]: [dirname(nodeExecutablePath), ...systemPaths].join(process.platform === "win32" ? ";" : ":"),
+    NODE: nodeExecutablePath,
+    npm_node_execpath: nodeExecutablePath,
+    npm_execpath: npmCliPath,
+    NO_UPDATE_NOTIFIER: "1",
+    npm_config_update_notifier: "false"
+  };
 }

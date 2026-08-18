@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { access, mkdir, mkdtemp, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, win32 } from "node:path";
 import { spawn } from "node:child_process";
 import type { HarnessUpdateSnapshot } from "../shared/contracts";
 import { activateRuntime, assertSafeVersion } from "./active-runtime";
@@ -253,6 +253,7 @@ export class HarnessUpdater extends EventEmitter {
           cwd: stagingPath,
           timeoutMs: this.options.installTimeoutMs ?? INSTALL_TIMEOUT_MS,
           environment: {
+            ...createNodeRuntimeEnvironment(this.options.nodeExecutable, this.options.npmCliPath),
             npm_config_cache: join(this.options.userDataPath, "npm-cache"),
             npm_config_update_notifier: "false"
           }
@@ -403,6 +404,27 @@ export async function verifyFileIntegrity(path: string, integrity: string): Prom
   if (actual !== expected) throw new Error("Harness 下载文件的 SHA-512 integrity 不匹配。");
 }
 
+export function createNodeRuntimeEnvironment(
+  nodeExecutable: string,
+  npmCliPath: string,
+  baseEnvironment: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform
+): NodeJS.ProcessEnv {
+  const preferredPathKey = platform === "win32" ? "Path" : "PATH";
+  const inheritedPath =
+    baseEnvironment[preferredPathKey] ??
+    Object.entries(baseEnvironment).find(([key]) => key.toLowerCase() === "path")?.[1];
+  const separator = platform === "win32" ? ";" : ":";
+  const nodeDirectory = platform === "win32" ? win32.dirname(nodeExecutable) : dirname(nodeExecutable);
+
+  return {
+    [preferredPathKey]: inheritedPath ? `${nodeDirectory}${separator}${inheritedPath}` : nodeDirectory,
+    NODE: nodeExecutable,
+    npm_node_execpath: nodeExecutable,
+    npm_execpath: npmCliPath
+  };
+}
+
 interface DownloadOptions {
   fetchImpl: typeof fetch;
   url: string;
@@ -507,7 +529,7 @@ function runProcess(command: string, args: string[], options: RunProcessOptions)
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
-      env: { ...process.env, ...options.environment },
+      env: mergeProcessEnvironment(options.environment),
       stdio: ["ignore", "pipe", "pipe"],
       detached: process.platform !== "win32",
       windowsHide: process.platform === "win32"
@@ -539,6 +561,19 @@ function runProcess(command: string, args: string[], options: RunProcessOptions)
       else rejectPromise(new Error(`命令执行失败（code=${String(code)}, signal=${String(signal)}）：${stderr.trim()}`));
     });
   });
+}
+
+function mergeProcessEnvironment(overrides: NodeJS.ProcessEnv | undefined): NodeJS.ProcessEnv {
+  const environment = { ...process.env };
+  for (const [key, value] of Object.entries(overrides ?? {})) {
+    if (key.toLowerCase() === "path") {
+      for (const existingKey of Object.keys(environment)) {
+        if (existingKey.toLowerCase() === "path") delete environment[existingKey];
+      }
+    }
+    environment[key] = value;
+  }
+  return environment;
 }
 
 function appendLimited(current: string, next: string): string {

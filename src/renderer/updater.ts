@@ -161,7 +161,7 @@ function phaseDetails(phase: HarnessUpdatePhase): string {
     case "downloading":
       return "下载完成后会核对 npm Registry 提供的 SHA-512 integrity。";
     case "installing":
-      return "正在使用 DHDesk 内置的 Node.js 与 npm 安装生产依赖。";
+      return "正在使用 DHDesk 内置的 Node.js 与 npm 解析并安装生产依赖；依赖较多时可能需要数分钟。";
     case "verifying":
       return "正在执行版本检查、本地 Web 服务启动和 HTTP 健康检查。";
     case "ready":

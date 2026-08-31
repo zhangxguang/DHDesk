@@ -38,7 +38,7 @@ Runtime 与用户数据分离。下载安装和失败清理只操作 DHDesk 的�
 
 - Registry 默认固定为 `https://registry.npmjs.org`，自定义 Registry 必须使用 HTTPS；本机测试地址除外。
 - Registry 元数据必须属于 `@deepseek-ai/dsh`，且必须提供有效的 SHA-512 integrity 和 HTTPS tarball 地址。
-- 下载包最大 100 MB，安装默认最多等待 8 分钟。
+- 下载包最大 100 MB，安装默认最多等待 20 分钟；依赖解析期间会持续显示已用时。
 - npm 及其依赖安装脚本均使用 DHDesk 内置 Node.js，不依赖系统预装 Node/npm。
 - 每个版本使用独立目录，安装失败会删除临时目录，不覆盖正在使用的 Runtime。
 - 新版本必须通过目录结构、`dsh --version`、本地 Web 启动及 HTTP 健康检查。

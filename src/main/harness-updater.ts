@@ -20,7 +20,7 @@ import type { NodeRuntimeIdentity, RuntimeInstallation } from "./runtime-locator
 const PACKAGE_NAME = "@deepseek-ai/dsh";
 const DEFAULT_REGISTRY_URL = "https://registry.npmjs.org";
 const MAX_TARBALL_BYTES = 100 * 1024 * 1024;
-const INSTALL_TIMEOUT_MS = 8 * 60 * 1_000;
+const INSTALL_TIMEOUT_MS = 20 * 60 * 1_000;
 const DSH_ENTRY_PATH = join("node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
 
 interface RegistryMetadata {
@@ -234,31 +234,46 @@ export class HarnessUpdater extends EventEmitter {
       this.setState({
         ...this.snapshot,
         phase: "installing",
-        message: "正在安装生产依赖",
+        message: "正在解析并安装生产依赖（依赖较多时可能需要数分钟）",
         progress: 0.6
       });
-      await runProcess(
-        this.options.nodeExecutable,
-        [
-          this.options.npmCliPath,
-          "install",
-          "--omit=dev",
-          "--no-audit",
-          "--no-fund",
-          "--engine-strict",
-          "--foreground-scripts",
-          `--registry=${this.options.registryUrl ?? DEFAULT_REGISTRY_URL}`
-        ],
-        {
-          cwd: stagingPath,
-          timeoutMs: this.options.installTimeoutMs ?? INSTALL_TIMEOUT_MS,
-          environment: {
-            ...createNodeRuntimeEnvironment(this.options.nodeExecutable, this.options.npmCliPath),
-            npm_config_cache: join(this.options.userDataPath, "npm-cache"),
-            npm_config_update_notifier: "false"
+      const installStartedAt = Date.now();
+      const installProgressTimer = setInterval(() => {
+        this.setState({
+          ...this.snapshot,
+          phase: "installing",
+          message: `正在解析并安装生产依赖（${formatElapsed(Date.now() - installStartedAt)}）`,
+          progress: 0.6
+        });
+      }, 10_000);
+      try {
+        await runProcess(
+          this.options.nodeExecutable,
+          [
+            this.options.npmCliPath,
+            "install",
+            "--omit=dev",
+            "--no-audit",
+            "--no-fund",
+            "--engine-strict",
+            "--foreground-scripts",
+            "--install-strategy=shallow",
+            "--prefer-offline",
+            `--registry=${this.options.registryUrl ?? DEFAULT_REGISTRY_URL}`
+          ],
+          {
+            cwd: stagingPath,
+            timeoutMs: this.options.installTimeoutMs ?? INSTALL_TIMEOUT_MS,
+            environment: {
+              ...createNodeRuntimeEnvironment(this.options.nodeExecutable, this.options.npmCliPath),
+              npm_config_cache: join(this.options.userDataPath, "npm-cache"),
+              npm_config_update_notifier: "false"
+            }
           }
-        }
-      );
+        );
+      } finally {
+        clearInterval(installProgressTimer);
+      }
 
       this.setState({
         ...this.snapshot,
@@ -423,6 +438,12 @@ export function createNodeRuntimeEnvironment(
     npm_node_execpath: nodeExecutable,
     npm_execpath: npmCliPath
   };
+}
+
+function formatElapsed(milliseconds: number): string {
+  const minutes = Math.floor(milliseconds / 60_000);
+  if (minutes === 0) return "已用时不到 1 分钟";
+  return `已用时 ${minutes} 分钟`;
 }
 
 interface DownloadOptions {

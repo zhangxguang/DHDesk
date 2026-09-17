@@ -53,6 +53,16 @@ function dialog(): Element | null {
   return document.querySelector('[role="dialog"]')
 }
 
+/** Type into the key field the way a user edit reaches the controlled input. */
+async function type(text: string): Promise<void> {
+  await act(async () => {
+    const input = field()
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    setter.call(input, text)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
 function button(label: string): HTMLButtonElement {
   const match = [...document.querySelectorAll('button')].find(candidate => candidate.textContent === label)
   if (match === undefined) throw new Error(`no button labelled ${label}`)
@@ -96,25 +106,32 @@ describe('desktop channel first-run step', () => {
 
   it('stores the key and hands the step ledger on', async () => {
     const { complete, store } = await mount()
-    await act(async () => {
-      const input = field()
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, 'sk-zhuzi')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    await type('sk-zhuzi')
     await act(async () => { button(zh.save).click() })
     expect(store).toHaveBeenCalledWith('sk-zhuzi')
     expect(complete).toHaveBeenCalledTimes(1)
   })
 
+  it('stores a pasted key without its surrounding whitespace', async () => {
+    const { complete, store } = await mount()
+    await type('  sk-zhuzi\n')
+    await act(async () => { button(zh.save).click() })
+    expect(store).toHaveBeenCalledWith('sk-zhuzi')
+    expect(complete).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a whitespace-only key instead of storing an unusable credential', async () => {
+    const { complete, store } = await mount()
+    await type('   ')
+    expect(button(zh.save).disabled).toBe(true)
+    await act(async () => { button(zh.save).click() })
+    expect(store).not.toHaveBeenCalled()
+    expect(complete).not.toHaveBeenCalled()
+  })
+
   it('keeps the dialog open and reports the Host refusal when storing fails', async () => {
     const { complete } = await mount({ store: async () => 'credential store is read-only' })
-    await act(async () => {
-      const input = field()
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, 'sk-zhuzi')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    await type('sk-zhuzi')
     await act(async () => { button(zh.save).click() })
     expect(complete).not.toHaveBeenCalled()
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('credential store is read-only')

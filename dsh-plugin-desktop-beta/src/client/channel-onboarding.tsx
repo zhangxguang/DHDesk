@@ -150,12 +150,18 @@ export function DesktopChannelOnboarding({
     return () => { window.removeEventListener('keydown', onKeyDown) }
   }, [readiness, complete])
 
+  // The credential store rejects only an empty literal, so a pasted key
+  // carrying surrounding whitespace would be stored verbatim and then fail
+  // every request as an invalid credential. The field owns the trim.
+  const entered = value.trim()
+
   const save = useCallback(() => {
     setSaving(true)
     setFailure(undefined)
-    void storeKey(value).then(
+    void storeKey(entered).then(
       (refusal) => {
         if (refusal === undefined) {
+          setValue('')
           complete()
           return
         }
@@ -167,7 +173,7 @@ export function DesktopChannelOnboarding({
         setFailure(t('saveFailed'))
       },
     )
-  }, [complete, storeKey, t, value])
+  }, [complete, entered, storeKey, t])
 
   // A step still deciding renders null, so nothing paints or blocks the app
   // while the credential seam answers.
@@ -208,7 +214,7 @@ export function DesktopChannelOnboarding({
           <button
             type="button"
             className="dshDesktopChannelOnboardingSave"
-            disabled={saving || value.length === 0}
+            disabled={saving || entered.length === 0}
             onClick={save}
           >
             {saving ? t('saving') : t('save')}

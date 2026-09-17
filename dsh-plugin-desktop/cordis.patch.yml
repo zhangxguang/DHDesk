@@ -22,7 +22,7 @@
 # Desktop ships one hand-declared route so the model picker carries a custom
 # choice before any settings exist. The credential reference is what keeps the
 # route unusable — and the official first-run step in place — until its key is
-# stored on the Models page.
+# stored by the first-run step or on the Models page.
 - id: llm-pi-ai
   config:
     providers:

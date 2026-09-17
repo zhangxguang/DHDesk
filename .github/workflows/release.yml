@@ -1,0 +1,206 @@
+name: Release DHDesk
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'beta-v*'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        required: true
+        type: choice
+        options: [stable, beta]
+        default: stable
+      tag:
+        description: Git tag to create or update
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.release.outputs.channel }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      workspace: ${{ steps.release.outputs.workspace }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            channel="${INPUT_CHANNEL}"
+            tag="${INPUT_TAG}"
+          else
+            tag="${REF_NAME}"
+            if [[ "${tag}" == beta-* ]]; then channel=beta; else channel=stable; fi
+          fi
+          if [[ "${channel}" == stable ]]; then
+            workspace=dsh-plugin-desktop
+            expected_prefix=v
+            version="${tag#v}"
+          else
+            workspace=dsh-plugin-desktop-beta
+            expected_prefix=beta-v
+            version="${tag#beta-v}"
+          fi
+          [[ "${tag}" == "${expected_prefix}"* ]] || { echo "${tag} does not match ${channel} channel" >&2; exit 1; }
+          node -e "const p=require('./${workspace}/package.json'); if(p.version !== process.argv[1]) throw new Error('tag version '+process.argv[1]+' does not match '+p.version)" "${version}"
+          {
+            echo "channel=${channel}"
+            echo "tag=${tag}"
+            echo "version=${version}"
+            echo "workspace=${workspace}"
+          } >> "$GITHUB_OUTPUT"
+
+  macos:
+    needs: prepare
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      WORKSPACE: ${{ needs.prepare.outputs.workspace }}
+      MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+      MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn aa:prepare-release
+      - run: yarn workspace dsh-community-market build
+      - name: Build signed universal macOS release
+        run: yarn workspace "$WORKSPACE" dist:mac
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dhdesk-${{ needs.prepare.outputs.channel }}-macos
+          path: ${{ needs.prepare.outputs.workspace }}/dist/mac-release/
+          if-no-files-found: error
+
+  windows:
+    needs: prepare
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      WORKSPACE: ${{ needs.prepare.outputs.workspace }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn aa:prepare-release
+      - run: yarn workspace dsh-community-market build
+      - name: Build unsigned Windows x64 installer
+        run: yarn workspace "$env:WORKSPACE" dist:win
+      - name: Build unsigned Windows x64 portable archive
+        run: yarn workspace "$env:WORKSPACE" dist:win-portable
+      - name: Record unsigned Windows signing status
+        shell: pwsh
+        run: |
+          @"
+          Authenticode: unavailable
+          Release-Publishable: false
+          The package verifier checked the PE/NSIS structure only. A certificate-bound
+          release must replace this status with verified Authenticode before publication.
+          "@ | Set-Content -Encoding utf8 "${{ runner.temp }}\windows-signing-status.txt"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dhdesk-${{ needs.prepare.outputs.channel }}-windows
+          path: |
+            ${{ needs.prepare.outputs.workspace }}/dist/
+            ${{ runner.temp }}\windows-signing-status.txt
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, macos, windows]
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - uses: actions/download-artifact@v6
+        with:
+          name: dhdesk-${{ needs.prepare.outputs.channel }}-macos
+          path: artifacts/macos
+      - uses: actions/download-artifact@v6
+        with:
+          name: dhdesk-${{ needs.prepare.outputs.channel }}-windows
+          path: artifacts/windows
+      - name: Enforce Windows Authenticode release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_file="$(find artifacts/windows -type f -name 'windows-signing-status.txt' -print -quit)"
+          if [[ -z "${status_file}" ]]; then
+            echo 'Windows signing status is missing; refusing to publish a release.' >&2
+            exit 1
+          fi
+          normalized_status="$(sed 's/\r$//' "${status_file}")"
+          if ! grep -Fqx 'Authenticode: verified' <<< "${normalized_status}" \
+            || ! grep -Fqx 'Release-Publishable: true' <<< "${normalized_status}"; then
+            cat "${status_file}" >&2
+            echo 'Windows artifacts are not Authenticode-verified; refusing to publish a release.' >&2
+            exit 1
+          fi
+      - run: corepack enable
+      - name: Assemble release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.blockmap' -o -name '*.sha256' -o -name '*.sha512' -o -name 'windows-signing-status.txt' \) -exec cp {} release/ \;
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            args=(release/*)
+            if [[ "$CHANNEL" == beta ]]; then args+=(--prerelease); fi
+            gh release create "$TAG" "${args[@]}" --repo "$GITHUB_REPOSITORY" --title "DHDesk $VERSION" --generate-notes
+          fi
+          if [[ "$CHANNEL" == beta ]]; then gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease; fi

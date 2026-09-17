@@ -1,0 +1,5 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the last
+# confirmed-consistent state. Both languages carry equal authority. Update both files
+# and re-record their hashes with git hash-object after editing either side.
+plugin-development.md: b80c7379676bbf96b2b9b6b5005152911a69625d
+plugin-development.en.md: e2cec59b95d7bce089927852465575cf8f004805

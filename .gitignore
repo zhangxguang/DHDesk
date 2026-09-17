@@ -1,12 +1,16 @@
-node_modules/
-dist/
-release/
-coverage/
 .DS_Store
-*.log
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+node_modules/
+*.tsbuildinfo
+.build/
 
-# Generated, platform-specific runtimes. Recreate with npm run runtime:prepare.
-resources/node/*
-!resources/node/.gitkeep
-resources/bundled-runtime/*
-!resources/bundled-runtime/.gitkeep
+dsh-plugin-desktop/dist/
+dsh-plugin-desktop/lib/
+dsh-community-market/lib/
+
+.env.yarn

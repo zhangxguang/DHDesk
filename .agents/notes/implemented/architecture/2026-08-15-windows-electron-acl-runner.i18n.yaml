@@ -1,0 +1,5 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the last
+# confirmed-consistent state. Both languages carry equal authority. Update both files
+# and re-record their hashes with git hash-object after editing either side.
+2026-08-15-windows-electron-acl-runner.md: 86905e59b154bc680e6bee9b59dc5a4e9b950fd0
+2026-08-15-windows-electron-acl-runner.zh.md: 4508c35ff2bcc0a3e5fcb643e96e5c16d32d0946

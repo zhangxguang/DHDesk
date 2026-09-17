@@ -19,6 +19,7 @@ import {
   type DesktopSetupWizardWindowsMaterial,
 } from '../../setup-wizard-contract.ts'
 import { desktopSetupWizardCopy, type DesktopSetupWizardCopy } from '../../setup-wizard-copy.ts'
+import { DESKTOP_REMOTE_CONTROL_ENABLED } from '../../desktop-features.ts'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert.tsx'
 import { Badge } from '../components/ui/badge.tsx'
 import { Button } from '../components/ui/button.tsx'
@@ -58,25 +59,29 @@ export const DESKTOP_SETUP_WIZARD_STEPS = Object.freeze([
   'mode',
   'material',
   'market',
-  'aa',
+  ...(DESKTOP_REMOTE_CONTROL_ENABLED ? ['aa'] as const : [] as const),
   'notifications',
   'browser',
   'success',
 ] as const satisfies readonly DesktopSetupWizardStep[])
 
+// Widened for lookup only: a closed remote-control gate removes 'aa' from the
+// tuple, while an 'aa' step restored from window state must still be rejected.
+const orderedDesktopSetupWizardSteps: readonly DesktopSetupWizardStep[] = DESKTOP_SETUP_WIZARD_STEPS
+
 export function previousDesktopSetupWizardStep(
   step: DesktopSetupWizardStep,
 ): DesktopSetupWizardStep | undefined {
-  const index = DESKTOP_SETUP_WIZARD_STEPS.indexOf(step)
-  return index > 0 ? DESKTOP_SETUP_WIZARD_STEPS[index - 1] : undefined
+  const index = orderedDesktopSetupWizardSteps.indexOf(step)
+  return index > 0 ? orderedDesktopSetupWizardSteps[index - 1] : undefined
 }
 
 export function nextDesktopSetupWizardStep(
   step: DesktopSetupWizardStep,
 ): DesktopSetupWizardStep | undefined {
-  const index = DESKTOP_SETUP_WIZARD_STEPS.indexOf(step)
-  return index >= 0 && index < DESKTOP_SETUP_WIZARD_STEPS.length - 1
-    ? DESKTOP_SETUP_WIZARD_STEPS[index + 1]
+  const index = orderedDesktopSetupWizardSteps.indexOf(step)
+  return index >= 0 && index < orderedDesktopSetupWizardSteps.length - 1
+    ? orderedDesktopSetupWizardSteps[index + 1]
     : undefined
 }
 
@@ -450,7 +455,8 @@ export function SetupWizardStepPage({
 }): JSX.Element {
   if (step === 'mode') return <Page step={step} subtitle={copy.presentationBody} title={copy.presentationTitle}><ModeOptions copy={copy} input={input} selection={selection} update={update} /></Page>
   if (step === 'material') return <Page step={step} subtitle={copy.windowMaterialBody} title={copy.windowMaterial}><MaterialOptions copy={copy} input={input} selection={selection} update={update} /></Page>
-  if (step === 'aa') return <Page step={step} subtitle={copy.aaIntro} title={copy.aaTitle}>
+  if (step === 'aa') return DESKTOP_REMOTE_CONTROL_ENABLED
+    ? <Page step={step} subtitle={copy.aaIntro} title={copy.aaTitle}>
     <RadioGroup aria-label={copy.aaTitle} name="setup-aa" value={String(selection.aaEnabled === true)}
       onValueChange={value => { if (value === 'true' || value === 'false') update({ ...selection, aaEnabled: value === 'true' }) }}>
       {[false, true].map(enabled => <Choice key={String(enabled)} id={`setup-aa-${String(enabled)}`}
@@ -464,6 +470,7 @@ export function SetupWizardStepPage({
       <p className="text-xs leading-relaxed text-muted-foreground">{copy.aaNextDesktop}</p>
     </aside>}
   </Page>
+    : <div data-setup-step={step} />
   if (step === 'market') return <Page step={step} subtitle={copy.marketBody} title={copy.marketTitle}><MarketOptions copy={copy} selection={selection} update={update} /></Page>
   if (step === 'notifications') return <Page step={step} subtitle={copy.notificationsBody} title={copy.notificationsTitle}><NotificationOptions copy={copy} notifications={selection.notifications} update={notifications => { update({ ...selection, notifications }) }} /></Page>
   if (step === 'browser') return <Page step={step} subtitle={copy.browserBody} title={copy.browserTitle}><BrowserOptions copy={copy} requestBrowserAccess={requestBrowserAccess} requestExposure={requestExposure} selection={selection} /></Page>

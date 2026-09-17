@@ -4,6 +4,7 @@ import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { DSH_LAUNCH_ENVIRONMENT_KEY, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import { DESKTOP_PACKAGE_NAME as BIN_NAME } from './product-identity.ts'
 import { DESKTOP_SETTINGS_NAMESPACE, type DesktopSettings } from './index.ts'
+import { DESKTOP_REMOTE_CONTROL_ENABLED } from './desktop-features.ts'
 import { DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE, type DesktopNotificationSettings } from './notifications.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
 import { createDesktopWebProfile, listDesktopProfiles, canDeleteDesktopProfile, deleteDesktopProfile, selectDesktopProfile } from './profile-manager.ts'
@@ -184,15 +185,18 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
         hostCtx.provide('desktopSettingsController', new DesktopSettingsController({
           profiles: hostCtx.desktopProfiles,
           readMarket,
-          readAa: () => ({ requested: currentProfilePreferences.aaEnabled === true, effective: prepared.aaEnabled }),
-          selectAa: async enabled => {
-            await enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
-              current,
-              current.notifications,
-              current.market,
-              enabled,
-            ))
-          },
+          aaAvailable: DESKTOP_REMOTE_CONTROL_ENABLED,
+          ...(DESKTOP_REMOTE_CONTROL_ENABLED ? {
+            readAa: () => ({ requested: currentProfilePreferences.aaEnabled === true, effective: prepared.aaEnabled }),
+            selectAa: async enabled => {
+              await enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
+                current,
+                current.notifications,
+                current.market,
+                enabled,
+              ))
+            },
+          } : {}),
           readWeb: () => {
             const lan = lanHttps.snapshot()
             const lanOrigins = lan.state === 'ready' && lan.actualPort !== null
@@ -216,7 +220,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
               current,
               current.notifications,
               provider,
-              current.aaEnabled === true,
+              current.aaEnabled === true && DESKTOP_REMOTE_CONTROL_ENABLED,
             ))
             return desktopMarketSnapshotWithEffective(
               await selectDesktopMarketProvider(marketUserDataDir, provider),
@@ -265,7 +269,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
           ? next as DesktopNotificationSettings
           : ctx.settings.get(DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) as DesktopNotificationSettings,
         current.market,
-        current.aaEnabled === true,
+        current.aaEnabled === true && DESKTOP_REMOTE_CONTROL_ENABLED,
       ))
       void write.catch((cause: unknown) => {
         ctx.logger.error(

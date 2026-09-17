@@ -86,8 +86,11 @@ export interface DesktopSettingsResponse {
   readonly current: string
   /** Fresh profile discovery without filesystem paths or manifest details. */
   readonly profiles: readonly DesktopSettingsProfileView[]
-  /** Market choice for the current and next generation. */
-  readonly aa: { readonly requested: boolean; readonly effective: boolean }
+  /**
+   * Remote-control (Agents-Anywhere) request for the current and next
+   * generation. Absent while the build's remote-control gate is closed.
+   */
+  readonly aa?: { readonly requested: boolean; readonly effective: boolean }
   readonly market: DesktopSettingsMarketView
   /** Actual browser URLs for the current WebServer generation. */
   readonly web: DesktopSettingsWebView

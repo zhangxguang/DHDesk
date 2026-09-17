@@ -52,6 +52,7 @@ import type {
 } from './lifecycle-events.ts'
 import { FileExporter } from './file-exporter.ts'
 import { DESKTOP_SETTINGS_NAMESPACE, type DesktopSettings } from './index.ts'
+import { DESKTOP_REMOTE_CONTROL_ENABLED } from './desktop-features.ts'
 import {
   desktopLanBrowserUrls,
   desktopLoopbackBrowserUrl,
@@ -1171,7 +1172,11 @@ async function start(): Promise<void> {
       ? legacyMarketSelection
       : desktopProfileMarketSnapshot(profilePreferences.market)
     const preparationHooks = {
-      get aaEnabled() { return safeModePaths === undefined && profilePreferences?.aaEnabled === true },
+      get aaEnabled() {
+        return DESKTOP_REMOTE_CONTROL_ENABLED
+          && safeModePaths === undefined
+          && profilePreferences?.aaEnabled === true
+      },
       lanAddresses,
       onSettingsDocumentResolved: (settingsDocument: string) => {
         if (startupRecoveryConfigurationPaths === undefined) return
@@ -1292,7 +1297,7 @@ async function start(): Promise<void> {
           micaSupported: process.platform === 'win32' && windowsSupportsMica(runtime.windowsBuild),
           ...setupSettings,
           market: marketSelection.requested,
-          aaEnabled: profilePreferences?.aaEnabled === true,
+          aaEnabled: DESKTOP_REMOTE_CONTROL_ENABLED && profilePreferences?.aaEnabled === true,
         },
       })
       let setupResult: DesktopSetupWizardResult
@@ -1328,7 +1333,7 @@ async function start(): Promise<void> {
             setupResult.selection,
             setupResult.selection.notifications,
             setupResult.selection.market,
-            setupResult.selection.aaEnabled === true,
+            DESKTOP_REMOTE_CONTROL_ENABLED && setupResult.selection.aaEnabled === true,
           ),
         )
         await updateDesktopSetupWizardSettings(prepared.settingsDocument, {
@@ -1424,7 +1429,9 @@ async function start(): Promise<void> {
         throw new Error(`${BIN_NAME}: Profile dependency migration failed: ${maskSecrets(detail)}`)
       }
     }
-    if (prepared.aaFailure !== undefined) {
+    // A closed remote-control gate reports the same failure for a plugin this
+    // build never requests, so the diagnostic stays silent until it reopens.
+    if (prepared.aaFailure !== undefined && DESKTOP_REMOTE_CONTROL_ENABLED) {
       electronLogger.error(`${BIN_NAME}: requested AA bundle was disabled for this generation: ${maskSecrets(prepared.aaFailure)}`)
     }
     if (prepared.marketFailure !== undefined) {

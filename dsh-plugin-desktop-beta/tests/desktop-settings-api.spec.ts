@@ -67,6 +67,9 @@ type DesktopSettingsControllerBootstrapOverrides = Omit<
 
 function bootstrap(overrides: DesktopSettingsControllerBootstrapOverrides = {}): DesktopSettingsControllerBootstrap {
   return {
+    // Availability is opt-in per fixture because the shipped build closes the
+    // remote-control gate; only these cases exercise the AA contract.
+    aaAvailable: true,
     readMarket: () => market(),
     readWeb: () => ({
       localUrl: 'http://127.0.0.1:43120/',
@@ -204,6 +207,15 @@ describe('desktop settings controller', () => {
     })
     expect(JSON.stringify(controller.read())).not.toContain('/private')
     expect(JSON.stringify(controller.read())).not.toContain('private-bundle')
+  })
+
+  it('omits remote-control state entirely when the build closes the gate', () => {
+    const readAa = vi.fn(() => ({ requested: true, effective: true }))
+    const controller = new DesktopSettingsController(bootstrap({ aaAvailable: false, readAa }))
+
+    expect(controller.read().aa).toBeUndefined()
+    expect(readAa).not.toHaveBeenCalled()
+    expect(JSON.stringify(controller.read())).not.toContain('aa')
   })
 
   it('creates without selecting or restarting and returns a fresh safe state', () => {

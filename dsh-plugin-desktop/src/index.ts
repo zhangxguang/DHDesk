@@ -56,6 +56,7 @@ import {
   handleDesktopTerminalOpenRequest,
 } from './desktop-settings-route.ts'
 import type {} from './desktop-settings-controller.ts'
+import { DESKTOP_REMOTE_CONTROL_ENABLED } from './desktop-features.ts'
 import { DESKTOP_LAN_HTTPS_CA_PATH } from './lan-https-runtime.ts'
 import { desktopBootRecoveryInjections } from './desktop-boot-recovery.ts'
 import type { DesktopLocale, DesktopShellMode } from './runtime.ts'
@@ -494,7 +495,7 @@ export function apply(ctx: Context, config: Config): void {
           }
           return theme.preference
         },
-        ...(desktopSettings === undefined ? {} : {
+        ...(desktopSettings === undefined || !DESKTOP_REMOTE_CONTROL_ENABLED ? {} : {
           readRemoteControl: async () => {
             const aa = desktopSettings.read().aa
             return aa?.requested === true || aa?.effective === true

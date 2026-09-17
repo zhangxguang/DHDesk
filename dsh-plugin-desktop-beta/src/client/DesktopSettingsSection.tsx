@@ -622,7 +622,9 @@ export function DesktopSettingsSection({
         )}
       </section>
 
-      <section className="dshDesktopSettingsGroup" aria-labelledby="dsh-desktop-aa-title">
+      {/* Remote control is hidden entirely while the Host reports no AA state,
+          which is how a closed build gate reaches the renderer. */}
+      {view?.aa !== undefined && <section className="dshDesktopSettingsGroup" aria-labelledby="dsh-desktop-aa-title">
         <div>
           <h3 id="dsh-desktop-aa-title">{t('aaTitle')}</h3>
           <p className="dshDesktopSettingsGroupIntro">{t('aaIntro')}</p>
@@ -649,7 +651,7 @@ export function DesktopSettingsSection({
               ? t('retryAa') : (view.aa?.requested ?? false) === enabled ? t('selected') : undefined}
           />)}
         </div>}
-      </section>
+      </section>}
 
       <section className="dshDesktopSettingsGroup" aria-labelledby="dsh-desktop-presentation-title">
         <div>

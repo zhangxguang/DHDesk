@@ -20,7 +20,9 @@ import {
   SetupWizardStepPage,
   SetupWizardSuccess,
   SetupWizardWelcome,
+  type DesktopSetupWizardStep,
 } from '../src/native-ui/setup-wizard/App.tsx'
+import { DESKTOP_REMOTE_CONTROL_ENABLED } from '../src/desktop-features.ts'
 import { Button } from '../src/native-ui/components/ui/button.tsx'
 import { DialogClose } from '../src/native-ui/components/ui/dialog.tsx'
 import { desktopSetupWizardCopy } from '../src/setup-wizard-copy.ts'
@@ -60,7 +62,9 @@ const selection: DesktopSetupWizardSelection = {
 const copy = desktopSetupWizardCopy('zh')
 
 function renderStep(
-  step: Exclude<(typeof DESKTOP_SETUP_WIZARD_STEPS)[number], 'welcome' | 'success'>,
+  // Widened on purpose: a closed remote-control gate removes 'aa' from the
+  // shipped step list while this suite still asserts its hidden rendering.
+  step: Exclude<DesktopSetupWizardStep, 'welcome' | 'success'>,
   current: DesktopSetupWizardSelection = selection,
 ): string {
   return renderToStaticMarkup(createElement(SetupWizardStepPage, {
@@ -103,7 +107,7 @@ describe('Setup Wizard step flow', () => {
       'mode',
       'material',
       'market',
-      'aa',
+      ...(DESKTOP_REMOTE_CONTROL_ENABLED ? ['aa'] : []),
       'notifications',
       'browser',
       'success',
@@ -111,13 +115,15 @@ describe('Setup Wizard step flow', () => {
   })
 
   it('moves only between adjacent pages and stops at both boundaries', () => {
+    const ordered: readonly DesktopSetupWizardStep[] = DESKTOP_SETUP_WIZARD_STEPS
+    const remoteControl = DESKTOP_REMOTE_CONTROL_ENABLED ? ['aa'] : []
     expect(DESKTOP_SETUP_WIZARD_STEPS.map(step => previousDesktopSetupWizardStep(step))).toEqual([
       undefined,
       'welcome',
       'mode',
       'material',
       'market',
-      'aa',
+      ...remoteControl,
       'notifications',
       'browser',
     ])
@@ -125,12 +131,19 @@ describe('Setup Wizard step flow', () => {
       'mode',
       'material',
       'market',
-      'aa',
+      ...remoteControl,
       'notifications',
       'browser',
       'success',
       undefined,
     ])
+    // The gate alone decides whether the page is reachable, and a step restored
+    // from window state navigates only while that page is in the ordered list.
+    expect(ordered.includes('aa')).toBe(DESKTOP_REMOTE_CONTROL_ENABLED)
+    expect(nextDesktopSetupWizardStep('aa'))
+      .toBe(DESKTOP_REMOTE_CONTROL_ENABLED ? 'notifications' : undefined)
+    expect(previousDesktopSetupWizardStep('aa'))
+      .toBe(DESKTOP_REMOTE_CONTROL_ENABLED ? 'market' : undefined)
   })
 })
 
@@ -458,10 +471,17 @@ describe('Setup Wizard native UI boundaries', () => {
   })
 })
 
-it('offers AA opt-in with a Beta badge after the market page', () => {
+it('renders no remote-control content while the feature gate stays closed', () => {
   const html = renderStep('aa')
-  expect(html).toContain('Agents-Anywhere')
-  expect(html).toContain('Beta')
-  expect(html).toContain('setup-aa-false')
-  expect(html).toContain('setup-aa-true')
+  const body = renderStep('browser')
+  if (DESKTOP_REMOTE_CONTROL_ENABLED) {
+    expect(html).toContain('Agents-Anywhere')
+    expect(html).toContain('Beta')
+    expect(html).toContain('setup-aa-false')
+    expect(html).toContain('setup-aa-true')
+  } else {
+    expect(html).not.toContain('Agents-Anywhere')
+    expect(html).not.toContain('setup-aa-')
+  }
+  expect(body).not.toContain('Agents-Anywhere')
 })

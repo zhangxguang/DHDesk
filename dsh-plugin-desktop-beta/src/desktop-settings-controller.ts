@@ -31,6 +31,8 @@ export interface DesktopSettingsControllerBootstrap {
   /** Read the latest persisted request and the startup-effective provider. */
   readAa?(): { readonly requested: boolean; readonly effective: boolean }
   selectAa?(enabled: boolean): Promise<void>
+  /** Whether this build exposes remote control at all; absent means hidden. */
+  readonly aaAvailable?: boolean
   readMarket(): DesktopMarketSnapshot
   /** Persist an explicit provider request. */
   selectMarket(provider: DesktopMarketProvider): Promise<DesktopMarketSnapshot>
@@ -106,7 +108,11 @@ export class DesktopSettingsController {
           this.bootstrap.profiles.canDelete?.(profile.name) ?? false,
         )),
       ),
-      aa: Object.freeze(this.bootstrap.readAa?.() ?? { requested: false, effective: false }),
+      // A closed remote-control gate omits the field entirely, so the renderer
+      // has nothing to display and cannot select a bundle this build excludes.
+      ...(this.bootstrap.aaAvailable === true
+        ? { aa: Object.freeze(this.bootstrap.readAa?.() ?? { requested: false, effective: false }) }
+        : {}),
       market: projectMarket(this.bootstrap.readMarket(), this.effectiveMarket),
       web: Object.freeze({
         localUrl: web.localUrl,

@@ -1,5 +1,13 @@
 # Bundled Agents Anywhere (Beta)
 
+> **Currently hidden from the product.** `DESKTOP_REMOTE_CONTROL_ENABLED` in
+> `dsh-plugin-desktop/src/desktop-features.ts` (and its Beta twin) is `false`, so
+> the bundle is never composed, Desktop Setup has no phone-connection step,
+> Desktop settings shows no Agents-Anywhere group, and the native remote-control
+> action is absent. The tarball, packaging, and verification below stay in place
+> for the re-enable; that flag records why it is closed and what must be true
+> before it reopens.
+
 Desktop consumes `@agents-anywhere/dsh-bridge-next` as an external package. The
 pinned tarball is built from the AA v2 commit recorded in `provenance.json`;
 Desktop does not require an adjacent AA checkout at runtime. It includes the

@@ -1,8 +1,14 @@
 /** Native-owned remote-control discovery state and confirmation flow. */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { DESKTOP_REMOTE_CONTROL_ENABLED } from './desktop-features.ts'
 import type { DesktopLocale } from './runtime.ts'
 
+/**
+ * Copy for the native remote-control offer. The gate lives at the enable call
+ * below rather than in this object, so these literals keep their exact types
+ * with the feature closed.
+ */
 export const remoteControlOfferCopy = {
   zh: {
     label: '远程控制', title: '启用远程控制？',
@@ -46,6 +52,9 @@ export class RemoteControlOffer {
   }
 
   private async perform(locale: DesktopLocale): Promise<void> {
+    // A closed gate must not write, confirm, or enable anything: the same
+    // remote-control state is unreachable from every other entry point too.
+    if (!DESKTOP_REMOTE_CONTROL_ENABLED) return
     this.seen = true
     try {
       await mkdir(dirname(this.options.path), { recursive: true })

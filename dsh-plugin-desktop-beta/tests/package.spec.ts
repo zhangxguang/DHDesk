@@ -138,7 +138,12 @@ describe('published package surface', () => {
     expect(main).toContain('notifyDesktopSafeModeActive(runtime, electronLogger)')
     expect(main).toContain('safeModePaths !== undefined && DESKTOP_SAFE_MODE_DEFAULTS.settings.notifications.enabled')
     expect(main).toContain('const setupWizardState = safeModePaths === undefined')
-    expect(main).toContain('if (safeModePaths === undefined && desktopSetupWizardRequired(')
+    // Safe Mode reaches neither first-run branch: the default commit and the
+    // chooser both hang off the guard that excludes it.
+    // The decision itself is unit-tested; what only the launcher can show is
+    // that Safe Mode reaches it, so neither branch can touch disposable state.
+    expect(main).toContain('safeMode: safeModePaths !== undefined')
+    expect(main).toContain('desktopFirstRunAction({')
     expect(main).toContain('const safeModeDefaults = DESKTOP_SAFE_MODE_DEFAULTS')
     expect(main).toContain('updateDesktopSetupWizardSettings(prepared.settingsDocument, safeModeDefaults.settings)')
     expect(main).toContain('selectDesktopMarketProvider(marketUserDataDir, safeModeDefaults.market)')
@@ -617,10 +622,13 @@ describe('published package surface', () => {
     const requestedRecovery = main.indexOf('if (recoveryModeRequested)')
     const prepare = main.indexOf('let prepared = prepareDesktopProfile(')
     const setupState = main.indexOf('readDesktopSetupWizardState(', prepare)
-    const setupWindow = main.indexOf('new DesktopSetupWizardWindow({', setupState)
-    const usageHistory = main.indexOf('!hasDesktopProfileUsageHistory(releaseUserDataLocations, prepared.profile.dir, activeProfileName)', setupState)
-    expect(usageHistory).toBeGreaterThan(setupState)
-    expect(setupWindow).toBeGreaterThan(usageHistory)
+    const decision = main.indexOf('desktopFirstRunAction({', setupState)
+    const setupWindow = main.indexOf('new DesktopSetupWizardWindow({', decision)
+    // The decision consults the Profile's usage evidence (unit-tested in
+    // setup-wizard-defaults.spec.ts) before any chooser can open.
+    expect(main.slice(decision, setupWindow)).toContain('hasUsageHistory: () => hasDesktopProfileUsageHistory(')
+    expect(decision).toBeGreaterThan(setupState)
+    expect(setupWindow).toBeGreaterThan(decision)
     const setupRun = main.indexOf('await setupWizardWindow.run()', setupWindow)
     const skipBranch = main.indexOf("if (setupResult.action === 'skip')", setupRun)
     const completeBranch = main.indexOf('} else {', skipBranch)

@@ -52,7 +52,7 @@ import type {
 } from './lifecycle-events.ts'
 import { FileExporter } from './file-exporter.ts'
 import { DESKTOP_SETTINGS_NAMESPACE, type DesktopSettings } from './index.ts'
-import { DESKTOP_REMOTE_CONTROL_ENABLED } from './desktop-features.ts'
+import { DESKTOP_REMOTE_CONTROL_ENABLED, DESKTOP_SETUP_CHOOSER_ENABLED } from './desktop-features.ts'
 import {
   desktopLanBrowserUrls,
   desktopLoopbackBrowserUrl,
@@ -125,6 +125,7 @@ import {
   type SkippedOptionalEntry,
 } from './profile.ts'
 import { DesktopProfileCheckpoint } from './profile-checkpoint.ts'
+import { commitDesktopFirstRunDefaults, desktopFirstRunAction } from './setup-wizard-defaults.ts'
 import {
   completeOrSkipDesktopSetupWizard,
   desktopSetupWizardRequired,
@@ -1285,8 +1286,29 @@ async function start(): Promise<void> {
     const setupWizardState = safeModePaths === undefined
       ? readDesktopSetupWizardState(marketUserDataDir, prepared.profile.dir)
       : undefined
-    if (safeModePaths === undefined && desktopSetupWizardRequired(setupWizardState, setupWizardVersions)
-      && !hasDesktopProfileUsageHistory(releaseUserDataLocations, prepared.profile.dir, activeProfileName)) {
+    const firstRunAction = desktopFirstRunAction({
+      safeMode: safeModePaths !== undefined,
+      chooserEnabled: DESKTOP_SETUP_CHOOSER_ENABLED,
+      setupRequired: desktopSetupWizardRequired(setupWizardState, setupWizardVersions),
+      hasUsageHistory: () => hasDesktopProfileUsageHistory(
+        releaseUserDataLocations,
+        prepared.profile.dir,
+        activeProfileName,
+      ),
+    })
+    if (firstRunAction === 'commit-defaults') {
+      profilePreferences = await commitDesktopFirstRunDefaults({
+        userDataDir: marketUserDataDir,
+        profileDir: prepared.profile.dir,
+        settingsDocument: prepared.settingsDocument,
+        market: marketSelection.requested,
+        versions: setupWizardVersions,
+        reprepare: async () => {
+          prepared = prepareDesktopProfile(process.env.DSH_TELEMETRY_DISABLED, homeDir, process.platform,
+            activeProfileName, pluginManagementStatePath, marketSelection, preparationHooks)
+        },
+      })
+    } else if (firstRunAction === 'open-chooser') {
       const setupSettings = readDesktopSetupWizardSettings(prepared.settingsDocument)
       setupWizardWindow = new DesktopSetupWizardWindow({
         locale: desktopLocaleFromLanguageTag(app.getLocale()),

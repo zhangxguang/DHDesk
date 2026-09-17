@@ -109,9 +109,9 @@ Ordinary users can start with the [user guide](docs/user-guide.en.md); the devel
   </tr>
 </table>
 
-### First-run setup, browser access, and LAN exposure
+### First launch, browser access, and LAN exposure
 
-On the normal first launch of each uninitialized profile, Desktop shows its native Setup Wizard first. It can configure the window mode and system material, plugin marketplace, notifications, whether to open the system default browser automatically, and the Web access scope; it can also be skipped. The Host and main DSH window do not start until the wizard is completed or skipped. Completion or skip state is recorded separately for each profile; an explicit recovery launch still enters Recovery Assistant first.
+On the normal first launch of each uninitialized profile, Desktop no longer shows a Setup Wizard: a profile with no settings.yaml starts the Host and the main DSH window on the shipped defaults, and one that already has a settings.yaml inherits the choices it carries. The shipped defaults are compatibility mode, glass background on macOS (solid on Windows), loopback-only listening, no automatic browser launch, notifications on with all four alerts enabled, no plugin marketplace, and the phone connection off. These choices are recorded per profile and stay editable in **Desktop settings** at any time; an explicit recovery launch still enters Recovery Assistant first.
 
 The Web service listens on the local loopback interface by default. When **Open in browser** is enabled, Desktop hands the page to the system default browser after the Web service is actually ready; this preference does not change the listener exposure. **Desktop settings** shows the actual local URL below the control. LAN access is a separate opt-in setting and exposes the currently available LAN URLs when enabled.
 

@@ -43,5 +43,9 @@ export const DESKTOP_REMOTE_CONTROL_ENABLED: boolean = process.env.DSH_FEATURE_R
  *
  * `DSH_FEATURE_SETUP_CHOOSER=1` opens it for one process, so both branches of
  * the gate stay reachable while the shipped literal stays closed.
+ *
+ * Retained on purpose: this dead-looking path is the only way a user can make
+ * the first-run choices, so it is kept whole rather than deleted. See
+ * `.agents/notes/implemented/architecture/2026-09-17-first-run-defaults-over-chooser.md`.
  */
 export const DESKTOP_SETUP_CHOOSER_ENABLED: boolean = process.env.DSH_FEATURE_SETUP_CHOOSER === '1'

@@ -1,4 +1,5 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -10,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { applyAdvancedShell } from './advanced-shell.ts'
 import { startRendererBootReporter } from './boot-health.ts'
+import { applyDesktopChannelOnboarding } from './channel-onboarding.tsx'
 import { applyDesktopSettings } from './desktop-settings.ts'
 import { installDesktopDirectoryPickerBridge } from './directory-picker.ts'
 import { parseDesktopClientEnvironment } from './environment.ts'
@@ -18,6 +20,13 @@ import { installSidebarFooterStyles } from './sidebar-footer-styles.ts'
 import { desktopWindowService, provideDesktopWindow } from './window-service.ts'
 
 export { applyAdvancedShell } from './advanced-shell.ts'
+export { applyDesktopChannelOnboarding } from './channel-onboarding.tsx'
+export type {
+  DesktopChannelKeyState,
+  DesktopChannelOnboardingInjected,
+  DesktopChannelOnboardingProps,
+  DesktopChannelOnboardingReadiness,
+} from './channel-onboarding.tsx'
 export { applyDesktopSettings } from './desktop-settings.ts'
 export { applyExtendedShell, applyFramedShell } from './extended-shell.ts'
 export {
@@ -74,6 +83,7 @@ export const inject = [
   'locale',
   'connection',
   'remote',
+  'remote.credentials',
   'settingsScope',
   'sessions',
   'theme',
@@ -89,6 +99,9 @@ export function apply(ctx: ClientContext): void {
     'dsh-plugin-desktop: native window geometry service',
   )
   const desktopSettings = applyDesktopSettings(ctx, environment)
+  // Every mode shares the first-run step: the shipped channel is composition,
+  // and the official route's step is upstream's in every mode.
+  applyDesktopChannelOnboarding(ctx)
   // Every mode shares the footer seat: upstream's row flex would otherwise let
   // two launchers crush each other, and compatibility mode installs no frame styles.
   ctx.effect(

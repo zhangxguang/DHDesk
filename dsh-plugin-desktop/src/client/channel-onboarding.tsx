@@ -22,6 +22,15 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { en, zh, type DesktopChannelOnboardingLocaleKey } from './channel-onboarding-locales.ts'
 
+/** Provider route the composition ships for the channel. */
+export const DESKTOP_CHANNEL_PROVIDER = 'zhuzi'
+
+/** Model that route serves and that the shipped channel offers as its default. */
+export const DESKTOP_CHANNEL_MODEL = 'deepseek-v4.1-flash'
+
+/** Settings namespace owning the default selection for new sessions. */
+export const AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE = 'agent-default-model'
+
 /** Credential reference the shipped channel profile resolves for each request. */
 export const DESKTOP_CHANNEL_CREDENTIAL_REFERENCE = 'ZHUZI_API_KEY'
 
@@ -40,6 +49,14 @@ export const DESKTOP_CHANNEL_ONBOARDING_ORDER = -50
 
 /** Locale namespace owned by the shipped route's first-run step. */
 export const DESKTOP_CHANNEL_ONBOARDING_LOCALE_NAMESPACE = 'desktop.onboarding'
+
+/**
+ * Bound on the step's host read. The coordinator mounts only the active step,
+ * so a read that never settles would leave this step painting nothing while the
+ * official step waits behind it: the whole first run would stall silently. The
+ * bound settles the step instead, exactly as an unanswered read does.
+ */
+export const DESKTOP_CHANNEL_ONBOARDING_READ_TIMEOUT_MS = 10_000
 
 const STYLE_ID = 'dsh-desktop-channel-onboarding-styles'
 const FIELD_ID = 'dsh-desktop-channel-key-field'
@@ -82,6 +99,31 @@ export function desktopChannelOnboardingReadiness(
   return 'prompt'
 }
 
+/**
+ * Await one host read without letting a wedged seam hold the onboarding chain.
+ * @param read - the read to bound.
+ * @param timeoutMs - bound in milliseconds.
+ * @returns the read's value, or undefined when it rejects or the bound expires.
+ */
+export async function readWithinBound<T>(
+  read: () => Promise<T>,
+  timeoutMs: number = DESKTOP_CHANNEL_ONBOARDING_READ_TIMEOUT_MS,
+): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      read(),
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => { resolve(undefined) }, timeoutMs)
+      }),
+    ])
+  } catch {
+    return undefined
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
 /** Registration-side capabilities of the shipped route's first-run step. */
 export interface DesktopChannelOnboardingInjected {
   /**
@@ -95,6 +137,14 @@ export interface DesktopChannelOnboardingInjected {
    * @returns the Host refusal message, or undefined once stored.
    */
   readonly storeKey: (value: string) => Promise<string | undefined>
+  /**
+   * Point new sessions at the shipped channel. Composition leaves the default
+   * selection to the upstream bundle, which the official first-run step makes
+   * servable; a user who instead configures this channel has to move the
+   * default with it, or their first message would reach a route with no key.
+   * @returns the Host refusal message, or undefined once written.
+   */
+  readonly selectDefaultModel: () => Promise<string | undefined>
 }
 
 /** Renderer-composed props of the shipped route's first-run step. */
@@ -110,7 +160,7 @@ export type DesktopChannelOnboardingProps =
  * @returns the dialog, or null while the step decides or has nothing to ask.
  */
 export function DesktopChannelOnboarding({
-  complete, readKeyState, storeKey, t,
+  complete, readKeyState, selectDefaultModel, storeKey, t,
 }: DesktopChannelOnboardingProps): ReactNode {
   const [readiness, setReadiness] = useState<DesktopChannelOnboardingReadiness>('deciding')
   const [value, setValue] = useState('')
@@ -119,10 +169,9 @@ export function DesktopChannelOnboarding({
 
   useEffect(() => {
     let active = true
-    void readKeyState().then(
-      (keys) => { if (active) setReadiness(desktopChannelOnboardingReadiness(keys)) },
-      () => { if (active) setReadiness('settled') },
-    )
+    void readWithinBound(readKeyState).then((keys) => {
+      if (active) setReadiness(desktopChannelOnboardingReadiness(keys))
+    })
     return () => { active = false }
   }, [readKeyState])
 
@@ -158,22 +207,25 @@ export function DesktopChannelOnboarding({
   const save = useCallback(() => {
     setSaving(true)
     setFailure(undefined)
-    void storeKey(entered).then(
-      (refusal) => {
-        if (refusal === undefined) {
-          setValue('')
-          complete()
-          return
-        }
+    void (async () => {
+      // Storing the key is what the user asked for; moving the default with it
+      // is what keeps the first message from reaching a route without a key.
+      const refusal = await storeKey(entered).catch(() => t('saveFailed'))
+      if (refusal !== undefined) {
         setSaving(false)
         setFailure(refusal)
-      },
-      () => {
+        return
+      }
+      const defaultRefusal = await selectDefaultModel().catch(() => t('saveFailed'))
+      if (defaultRefusal !== undefined) {
         setSaving(false)
-        setFailure(t('saveFailed'))
-      },
-    )
-  }, [complete, entered, storeKey, t])
+        setFailure(defaultRefusal)
+        return
+      }
+      setValue('')
+      complete()
+    })()
+  }, [complete, entered, selectDefaultModel, storeKey, t])
 
   // A step still deciding renders null, so nothing paints or blocks the app
   // while the credential seam answers.
@@ -246,6 +298,13 @@ export function applyDesktopChannelOnboarding(ctx: ClientContext): void {
     const response = await ctx.remote.credentials.set(DESKTOP_CHANNEL_CREDENTIAL_REFERENCE, value)
     return response.ok ? undefined : response.error.message
   }
+  const selectDefaultModel = async (): Promise<string | undefined> => {
+    const response = await ctx.remote.settings.mutate(AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE, [
+      { op: 'set', path: ['provider'], value: DESKTOP_CHANNEL_PROVIDER },
+      { op: 'set', path: ['model'], value: DESKTOP_CHANNEL_MODEL },
+    ], undefined)
+    return response.ok ? undefined : response.error.message
+  }
 
   ctx.effect(
     () => ctx.locale.register(DESKTOP_CHANNEL_ONBOARDING_LOCALE_NAMESPACE, { zh, en }),
@@ -260,7 +319,7 @@ export function applyDesktopChannelOnboarding(ctx: ClientContext): void {
     id: DESKTOP_CHANNEL_ONBOARDING_STEP_ID,
     order: DESKTOP_CHANNEL_ONBOARDING_ORDER,
     locale: DESKTOP_CHANNEL_ONBOARDING_LOCALE_NAMESPACE,
-    inject: () => ({ readKeyState, storeKey }),
+    inject: () => ({ readKeyState, selectDefaultModel, storeKey }),
   }, DesktopChannelOnboarding))
 }
 

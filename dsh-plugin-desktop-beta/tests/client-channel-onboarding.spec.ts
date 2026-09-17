@@ -12,6 +12,7 @@ import {
   DesktopChannelOnboarding,
   desktopChannelOnboardingReadiness,
   OFFICIAL_ROUTE_CREDENTIAL_REFERENCE,
+  readWithinBound,
   type DesktopChannelKeyState,
   type DesktopChannelOnboardingProps,
 } from '../src/client/channel-onboarding.tsx'
@@ -26,10 +27,17 @@ let container: HTMLDivElement | undefined
 async function mount(options: {
   read?: () => Promise<DesktopChannelKeyState | undefined>
   store?: (value: string) => Promise<string | undefined>
-} = {}): Promise<{ complete: ReturnType<typeof vi.fn>; store: ReturnType<typeof vi.fn>; container: HTMLElement }> {
+  select?: () => Promise<string | undefined>
+} = {}): Promise<{
+  complete: ReturnType<typeof vi.fn>
+  store: ReturnType<typeof vi.fn>
+  select: ReturnType<typeof vi.fn>
+  container: HTMLElement
+}> {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   const complete = vi.fn()
   const store = vi.fn(options.store ?? (async () => undefined))
+  const select = vi.fn(options.select ?? (async () => undefined))
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
@@ -39,10 +47,11 @@ async function mount(options: {
     openSection: vi.fn(),
     readKeyState: options.read ?? (async () => ({ channel: false, official: false })),
     storeKey: store,
+    selectDefaultModel: select,
     t,
   } as unknown as DesktopChannelOnboardingProps
   await act(async () => { root!.render(createElement(DesktopChannelOnboarding, props)) })
-  return { complete, store, container }
+  return { complete, store, select, container }
 }
 
 function field(): HTMLInputElement {
@@ -104,12 +113,27 @@ describe('desktop channel first-run step', () => {
     expect(button(zh.save).disabled).toBe(true)
   })
 
-  it('stores the key and hands the step ledger on', async () => {
-    const { complete, store } = await mount()
+  it('stores the key, moves the default onto the route, then hands the ledger on', async () => {
+    const calls: string[] = []
+    const { complete, select, store } = await mount({
+      store: async () => { calls.push('store'); return undefined },
+      select: async () => { calls.push('select'); return undefined },
+    })
     await type('sk-zhuzi')
     await act(async () => { button(zh.save).click() })
     expect(store).toHaveBeenCalledWith('sk-zhuzi')
+    expect(select).toHaveBeenCalledTimes(1)
+    expect(calls).toEqual(['store', 'select'])
     expect(complete).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the dialog open when the default selection cannot be moved', async () => {
+    const { complete, store } = await mount({ select: async () => 'settings document is read-only' })
+    await type('sk-zhuzi')
+    await act(async () => { button(zh.save).click() })
+    expect(store).toHaveBeenCalledWith('sk-zhuzi')
+    expect(complete).not.toHaveBeenCalled()
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('settings document is read-only')
   })
 
   it('stores a pasted key without its surrounding whitespace', async () => {
@@ -229,5 +253,33 @@ describe('desktop channel first-run registration', () => {
     const injected = options.inject()
     await expect(injected.readKeyState()).resolves.toBeUndefined()
     await expect(injected.storeKey('sk-zhuzi')).resolves.toBe('read-only')
+  })
+})
+
+describe('shipped channel step host reads', () => {
+  it('returns the value a read produces', async () => {
+    await expect(readWithinBound(async () => 'value', 50)).resolves.toBe('value')
+  })
+
+  it('reports a refused read as no answer', async () => {
+    await expect(readWithinBound(async () => { throw new Error('offline') }, 50)).resolves.toBeUndefined()
+  })
+
+  it('bounds a read that never settles', async () => {
+    await expect(readWithinBound(() => new Promise<string>(() => {}), 5)).resolves.toBeUndefined()
+  })
+
+  it('settles a step whose read never answers, instead of stalling the chain', async () => {
+    vi.useFakeTimers()
+    try {
+      const { complete } = await mount({ read: () => new Promise(() => {}) })
+      // Nothing paints while the step decides, and the chain is still waiting.
+      expect(dialog()).toBeNull()
+      expect(complete).not.toHaveBeenCalled()
+      await act(async () => { vi.advanceTimersByTime(10_000) })
+      expect(complete).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

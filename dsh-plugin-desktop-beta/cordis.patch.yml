@@ -22,7 +22,10 @@
 # Desktop ships one hand-declared route so the model picker carries a custom
 # choice before any settings exist. The credential reference is what keeps the
 # route unusable — and the official first-run step in place — until its key is
-# stored by the first-run step or on the Models page.
+# stored by the first-run step or on the Models page. That step also moves the
+# default selection onto this route; composition leaves `agent-default-model`
+# to the upstream bundle on purpose, so a user who skips the step keeps a
+# default the official step can serve.
 - id: llm-pi-ai
   config:
     providers:
@@ -33,12 +36,6 @@
         models:
           - id: deepseek-v4.1-flash
           - id: grok-4.6
-
-# New sessions start on the shipped route rather than the upstream default.
-- id: agent-default-model
-  config:
-    provider: zhuzi
-    model: deepseek-v4.1-flash
 
 # A desktop launch has no terminal operator waiting for the Web readiness line.
 - id: web-runtime

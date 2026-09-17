@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-Desktop 有五类直接加载产品内置 HTML 的窗口：设置向导、Recovery、Profile 选择、Profile 创建和原生对话框。它们都不需要 Node、preload、popup 或 WebView，也不应与主 Renderer 共用 session。
+Desktop 有五类直接加载产品内置 HTML 的窗口：设置向导、Recovery、Profile 选择、Profile 创建和原生对话框。设置向导窗口保留在已关闭的 `DESKTOP_SETUP_CHOOSER_ENABLED` 开关之后（`desktop-features.ts`）：出厂路径不再构造它，但开关一旦打开，它仍必须具备下列全部保护。它们都不需要 Node、preload、popup 或 WebView，也不应与主 Renderer 共用 session。
 
 这些规则目前写在五个构造函数里。Profile 创建窗口已经关闭 `webviewTag`，但没有独立 `partition`，也没有注册 `will-attach-webview` 的拒绝监听器。其他四类窗口有这两项保护，但每处都复制了一遍。新增或修改窗口时，只看相邻代码很难知道哪些字段是产品安全不变量，哪些只是当前窗口的显示选项。
 

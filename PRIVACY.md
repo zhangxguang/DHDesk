@@ -2,8 +2,8 @@
 
 [中文](PRIVACY.zh.md)
 
-- **Version:** 1.0
-- **Effective and last updated:** August 26, 2026
+- **Version:** 1.1
+- **Effective and last updated:** September 17, 2026
 
 DHDesk is a local-first, open-source desktop application. This policy explains what information the official DHDesk distribution and official online services process, why they process it, who receives it, and what choices you have.
 
@@ -29,6 +29,7 @@ This policy does not control processing performed by third-party forks, modified
 - Installer downloads do not receive that installation UUID from Desktop, although the website, download host, and network infrastructure still receive ordinary network metadata.
 - Diagnostic archives are created locally only when you export them and are never uploaded automatically by DHDesk.
 - Model services, plugins, marketplace sources, and package services that you choose process data under their own terms. They do not become subject to this policy merely because DHDesk can connect to them.
+- The official distribution also ships one predeclared model channel run by a third party (section 6.1). It receives nothing until you store its API key.
 
 ## 3. Official version checks
 
@@ -121,6 +122,8 @@ DHDesk is a composable plugin platform. The following transfers are triggered by
 ### 6.1 Model and tool services
 
 When you configure and invoke a model provider, MCP service, external tool, or other API, the recipient may receive an API key, prompts, conversation context, attachments or file contents, tool inputs and outputs, session identifiers, network metadata, and other information required by that service's protocol. The exact scope depends on your configuration and request. Do not send sensitive data to a provider you do not trust.
+
+The official distribution additionally ships one model route that is predeclared in its profile rather than configured by you: the `zhuzi` channel (`https://token.zhuziplay.com/v1`), operated by a third party. Nothing is sent to it until you store that channel's API key. The first-run step offers that key and, once it is stored, makes the channel's `deepseek-v4.1-flash` the default model for new sessions. You can switch to another model, clear the key, or move the default back to the official DeepSeek route at any time; the key itself stays in this machine's credential file (section 5).
 
 Upstream DSH also maintains an `.anonymous-user-id` that is separate from the Desktop installation UUID. When you invoke the current default DeepSeek model adapter, it sends that identifier in the `x-deepseek-harness-user-id` header, together with an optional session ID, the API key, and the complete model request, to the DeepSeek or compatible `baseURL` you configure. Do not confuse it with `X-DHDesk-Installation-Id`.
 

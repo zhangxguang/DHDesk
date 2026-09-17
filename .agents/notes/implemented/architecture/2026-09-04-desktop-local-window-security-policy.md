@@ -6,7 +6,7 @@ English | [中文](2026-09-04-desktop-local-window-security-policy.zh.md)
 
 ## Problem
 
-Desktop has five window types that load product-owned HTML directly: Setup Wizard, Recovery, Profile selection, Profile creation, and native dialogs. They need no Node access, preload, popup, or WebView, and should not share a session with the main Renderer.
+Desktop has five window types that load product-owned HTML directly: Setup Wizard, Recovery, Profile selection, Profile creation, and native dialogs. The Setup Wizard window is retained behind the closed `DESKTOP_SETUP_CHOOSER_ENABLED` gate (`desktop-features.ts`): it is not constructed on the shipped path, and it must keep every protection below for whenever the gate opens. They need no Node access, preload, popup, or WebView, and should not share a session with the main Renderer.
 
 Those rules currently live in five constructors. Profile creation disables `webviewTag`, but has no dedicated `partition` and does not register a `will-attach-webview` denial listener. The other four windows carry those protections but copy them independently. When adding or changing a window, nearby code does not distinguish product security invariants from display options for that particular window.
 

@@ -4,7 +4,11 @@
 
 Download the macOS or Windows installer from the product download page. DHDesk includes Electron, Node, and its pinned DSH dependencies, so normal users do not need to install Node.js or pnpm separately.
 
-On first launch, the application prepares the default profile and starts the official DSH Web surface locally. Closing the window normally hides it; use **Quit** from the tray when you want to stop the application and Host process.
+On first launch, the application prepares the default profile and starts the official DSH Web surface locally without showing a setup chooser: a profile with no `settings.yaml` uses the shipped defaults, one that already has `settings.yaml` keeps its choices, and everything stays editable in **Desktop settings**.
+
+The first launch also shows one step asking for the `zhuzi` channel key. DHDesk predeclares that third-party channel (`https://token.zhuziplay.com/v1`) and lists its `deepseek-v4.1-flash` and `grok-4.6` in the model picker; once you store its API key, new sessions default to `deepseek-v4.1-flash`. Choosing **Not now** skips the step, leaves the official DeepSeek key step to run instead, and keeps the default model on the official route. The key is stored only in this machine's credential file.
+
+Closing the window normally hides it; use **Quit** from the tray when you want to stop the application and Host process.
 
 ## Profiles
 

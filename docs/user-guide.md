@@ -4,7 +4,11 @@
 
 从产品下载入口获取 macOS 或 Windows 安装包。安装后的 DHDesk 自带运行所需的 Electron、Node 和 DSH 依赖，普通用户不需要另行安装 Node.js 或 pnpm。
 
-首次启动时，应用会准备默认 profile，并在本机启动官方 DSH Web surface。关闭窗口通常只会隐藏窗口；可以从托盘重新打开，选择 **退出** 才会结束应用和 Host 进程。
+首次启动时，应用会准备默认 profile，并在本机启动官方 DSH Web surface，不显示设置选择窗口：还没有 `settings.yaml` 的 profile 使用出厂默认设置，已经有 `settings.yaml` 的则沿用其中的选择，之后随时可以在 **桌面设置** 里修改。
+
+首次启动还会显示一步 zhuzi 渠道的密钥引导。DHDesk 预置了由第三方运营的 `zhuzi` 渠道（`https://token.zhuziplay.com/v1`），并把它的 `deepseek-v4.1-flash` 和 `grok-4.6` 列进模型选择器；填入该渠道的 API Key 后，新会话默认使用 `deepseek-v4.1-flash`。选择 **稍后再说** 则跳过这一步，改由官方 DeepSeek 密钥引导接手，默认模型保持官方渠道。密钥只保存在本机凭据文件中。
+
+关闭窗口通常只会隐藏窗口；可以从托盘重新打开，选择 **退出** 才会结束应用和 Host 进程。
 
 ## Profile
 

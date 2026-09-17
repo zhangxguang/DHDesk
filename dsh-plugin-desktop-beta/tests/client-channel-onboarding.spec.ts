@@ -72,6 +72,11 @@ async function type(text: string): Promise<void> {
   })
 }
 
+/** The save control by role class: its label changes while a write is pending. */
+function saveButton(): HTMLButtonElement {
+  return document.querySelector<HTMLButtonElement>('.dshDesktopChannelOnboardingSave')!
+}
+
 function button(label: string): HTMLButtonElement {
   const match = [...document.querySelectorAll('button')].find(candidate => candidate.textContent === label)
   if (match === undefined) throw new Error(`no button labelled ${label}`)
@@ -166,6 +171,56 @@ describe('desktop channel first-run step', () => {
     await act(async () => { button(zh.skip).click() })
     expect(store).not.toHaveBeenCalled()
     expect(complete).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps Skip available while a save is in flight', async () => {
+    let finish!: (value: string | undefined) => void
+    const { complete } = await mount({
+      store: () => new Promise<string | undefined>((resolve) => { finish = resolve }),
+    })
+    await type('sk-zhuzi')
+    await act(async () => { button(zh.save).click() })
+    expect(saveButton().disabled).toBe(true)
+    expect(button(zh.skip).disabled).toBe(false)
+    await act(async () => { button(zh.skip).click() })
+    expect(complete).toHaveBeenCalledTimes(1)
+    // The abandoned write settles afterwards without touching the step again.
+    await act(async () => { finish(undefined) })
+    expect(complete).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores Escape while a save is in flight, then honours it', async () => {
+    let finish!: (value: string | undefined) => void
+    const { complete } = await mount({
+      store: () => new Promise<string | undefined>((resolve) => { finish = resolve }),
+    })
+    await type('sk-zhuzi')
+    await act(async () => { button(zh.save).click() })
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    expect(complete).not.toHaveBeenCalled()
+    await act(async () => { finish('credential store is read-only') })
+    expect(complete).not.toHaveBeenCalled()
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('credential store is read-only')
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    expect(complete).toHaveBeenCalledTimes(1)
+  })
+
+  it('focuses the key field and describes it with the hint', async () => {
+    await mount()
+    const input = field()
+    expect(document.activeElement).toBe(input)
+    expect(input.getAttribute('autocomplete')).toBe('new-password')
+    expect(input.getAttribute('aria-describedby')).toBe('dsh-desktop-channel-onboarding-hint')
+    expect(document.getElementById('dsh-desktop-channel-onboarding-hint')).not.toBeNull()
+  })
+
+  it('adds the failure to the field description while it shows', async () => {
+    const { complete } = await mount({ store: async () => 'read-only' })
+    await type('sk-zhuzi')
+    await act(async () => { button(zh.save).click() })
+    expect(complete).not.toHaveBeenCalled()
+    expect(field().getAttribute('aria-describedby'))
+      .toBe('dsh-desktop-channel-onboarding-hint dsh-desktop-channel-onboarding-failure')
   })
 
   it('settles without painting once a first-run key is already stored', async () => {

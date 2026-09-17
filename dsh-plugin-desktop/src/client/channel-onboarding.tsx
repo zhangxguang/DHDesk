@@ -9,7 +9,7 @@
  * official prompt, so the fallback stays upstream's.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -61,6 +61,8 @@ export const DESKTOP_CHANNEL_ONBOARDING_READ_TIMEOUT_MS = 10_000
 const STYLE_ID = 'dsh-desktop-channel-onboarding-styles'
 const FIELD_ID = 'dsh-desktop-channel-key-field'
 const TITLE_ID = 'dsh-desktop-channel-onboarding-title'
+const HINT_ID = 'dsh-desktop-channel-onboarding-hint'
+const FAILURE_ID = 'dsh-desktop-channel-onboarding-failure'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -166,6 +168,10 @@ export function DesktopChannelOnboarding({
   const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
+  const fieldRef = useRef<HTMLInputElement | null>(null)
+  // A save and a skip can race: the step is gone once it settles, so a late
+  // outcome must not write state into an unmounted dialog.
+  const settled = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -175,9 +181,14 @@ export function DesktopChannelOnboarding({
     return () => { active = false }
   }, [readKeyState])
 
+  const settle = useCallback(() => {
+    settled.current = true
+    complete()
+  }, [complete])
+
   useEffect(() => {
-    if (readiness === 'settled') complete()
-  }, [readiness, complete])
+    if (readiness === 'settled') settle()
+  }, [readiness, settle])
 
   // The visible branch owns the dialog chrome: the application root stays inert
   // and Escape skips the step, so nothing behind the mask accepts input.
@@ -190,14 +201,23 @@ export function DesktopChannelOnboarding({
     return () => { appRoot.inert = previous }
   }, [readiness])
 
+  // Escape is the Skip button by keyboard. It stays inert while a write is in
+  // flight: abandoning here would drop the outcome the user is waiting for.
   useEffect(() => {
     if (readiness !== 'prompt') return
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') complete()
+      if (event.key === 'Escape' && !saving) settle()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => { window.removeEventListener('keydown', onKeyDown) }
-  }, [readiness, complete])
+  }, [readiness, saving, settle])
+
+  // The field is the only control the step needs; focus it so a keyboard user
+  // does not start from a body that the mask left inert.
+  useEffect(() => {
+    if (readiness !== 'prompt') return
+    fieldRef.current?.focus()
+  }, [readiness])
 
   // The credential store rejects only an empty literal, so a pasted key
   // carrying surrounding whitespace would be stored verbatim and then fail
@@ -211,21 +231,23 @@ export function DesktopChannelOnboarding({
       // Storing the key is what the user asked for; moving the default with it
       // is what keeps the first message from reaching a route without a key.
       const refusal = await storeKey(entered).catch(() => t('saveFailed'))
+      if (settled.current) return
       if (refusal !== undefined) {
         setSaving(false)
         setFailure(refusal)
         return
       }
       const defaultRefusal = await selectDefaultModel().catch(() => t('saveFailed'))
+      if (settled.current) return
       if (defaultRefusal !== undefined) {
         setSaving(false)
         setFailure(defaultRefusal)
         return
       }
       setValue('')
-      complete()
+      settle()
     })()
-  }, [complete, entered, selectDefaultModel, storeKey, t])
+  }, [entered, selectDefaultModel, settle, storeKey, t])
 
   // A step still deciding renders null, so nothing paints or blocks the app
   // while the credential seam answers.
@@ -244,23 +266,28 @@ export function DesktopChannelOnboarding({
         <label className="dshDesktopChannelOnboardingLabel" htmlFor={FIELD_ID}>{t('keyLabel')}</label>
         <input
           id={FIELD_ID}
+          ref={fieldRef}
           className="dshDesktopChannelOnboardingInput"
           type="password"
           value={value}
-          autoComplete="off"
+          // `new-password` is what stops a password manager offering to save an
+          // API key as a site credential; `off` is widely ignored for password
+          // fields.
+          autoComplete="new-password"
+          aria-describedby={failure === undefined ? HINT_ID : `${HINT_ID} ${FAILURE_ID}`}
           spellCheck={false}
           placeholder={t('keyPlaceholder')}
           disabled={saving}
           onChange={(event) => { setValue(event.target.value) }}
         />
-        <p className="dshDesktopChannelOnboardingHint">{t('hint')}</p>
+        <p id={HINT_ID} className="dshDesktopChannelOnboardingHint">{t('hint')}</p>
         {failure !== undefined && (
-          <p className="dshDesktopChannelOnboardingFailure" role="alert">
+          <p id={FAILURE_ID} className="dshDesktopChannelOnboardingFailure" role="alert">
             {t('saveFailed')} <span className="dshDesktopChannelOnboardingDetail">{failure}</span>
           </p>
         )}
         <div className="dshDesktopChannelOnboardingActions">
-          <button type="button" className="dshDesktopChannelOnboardingSkip" disabled={saving} onClick={complete}>
+          <button type="button" className="dshDesktopChannelOnboardingSkip" onClick={settle}>
             {t('skip')}
           </button>
           <button

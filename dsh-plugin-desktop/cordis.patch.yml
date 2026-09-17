@@ -19,6 +19,27 @@
     - id: desktop-updates
       name: dsh-plugin-desktop/updates
 
+# Desktop ships one hand-declared route so the model picker carries a custom
+# choice before any settings exist. The credential reference is what keeps the
+# route unusable — and the official first-run step in place — until its key is
+# stored on the Models page.
+- id: llm-pi-ai
+  config:
+    providers:
+      zhuzi:
+        baseURL: https://token.zhuziplay.com/v1
+        api: openai-responses
+        apiKeyEnv: ZHUZI_API_KEY
+        models:
+          - id: deepseek-v4.1-flash
+          - id: grok-4.6
+
+# New sessions start on the shipped route rather than the upstream default.
+- id: agent-default-model
+  config:
+    provider: zhuzi
+    model: deepseek-v4.1-flash
+
 # A desktop launch has no terminal operator waiting for the Web readiness line.
 - id: web-runtime
   config:

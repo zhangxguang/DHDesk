@@ -93,6 +93,10 @@ export async function commitDesktopFirstRunDefaults(
     aaEnabled: false,
   })
   await input.reprepare()
-  await completeOrSkipDesktopSetupWizard(input.userDataDir, input.profileDir, 'skipped', input.versions)
+  // `completed`, not `skipped`: the launcher finished Setup with the shipped
+  // defaults. The marker is read as usage evidence by channel admission, where
+  // "this Profile left first run" is the fact that matters, and calling it a
+  // skip would report a user decision that never happened.
+  await completeOrSkipDesktopSetupWizard(input.userDataDir, input.profileDir, 'completed', input.versions)
   return preferences
 }

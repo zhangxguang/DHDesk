@@ -25,7 +25,9 @@
 # stored by the first-run step or on the Models page. That step also moves the
 # default selection onto this route; composition leaves `agent-default-model`
 # to the upstream bundle on purpose, so a user who skips the step keeps a
-# default the official step can serve.
+# default the official step can serve. The route itself stays composition-owned:
+# the Models page can edit every leaf and override it, but cannot delete a row
+# this file declares.
 - id: llm-pi-ai
   config:
     providers:

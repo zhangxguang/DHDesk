@@ -89,7 +89,7 @@ describe('Desktop first-run defaults', () => {
     // so preferences cannot move it: both writes name the same directory.
     expect(order).toEqual(['reprepare'])
     expect(readDesktopSetupWizardState(userData, profileDir)).toMatchObject({
-      outcome: 'skipped',
+      outcome: 'completed',
       ...VERSIONS,
     })
   })
@@ -153,7 +153,7 @@ describe('Desktop first-run defaults', () => {
       market: preferences.market,
       aaEnabled: preferences.aaEnabled,
     })
-    expect(readDesktopSetupWizardState(userData, profileDir)?.outcome).toBe('skipped')
+    expect(readDesktopSetupWizardState(userData, profileDir)?.outcome).toBe('completed')
   })
 })
 
